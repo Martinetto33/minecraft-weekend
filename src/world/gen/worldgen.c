@@ -302,6 +302,7 @@ void worldgen_generate(struct Chunk *chunk) {
             n_n = expscale(&cs[3], 3.0f, 1.0f / 512.0f),
             n_p = expscale(&cs[4], 3.0f, 1.0f / 512.0f);
 
+        /* TODO: potentially parallelisable code! */
         for (s64 x = 0; x < CHUNK_SIZE.x; x++) {
             for (s64 z = 0; z < CHUNK_SIZE.z; z++) {
                 s64 wx = chunk->position.x + x, wz = chunk->position.z + z;
