@@ -20,7 +20,7 @@
 
 #### Building
 
-You will need to install a bunch of libraries. Depending on your linux distribution, you may need to change the used package manager for installation. Here's a general command taken from https://github.com/jdah/minecraft-weekend/issues/40:
+You will need to install a bunch of libraries. Depending on your linux distribution, you may need to change the package manager used for installation. Here's a general command taken from https://github.com/jdah/minecraft-weekend/issues/40:
 ```
 sudo apt install clang cmake libxss-dev libxxf86vm-dev libxkbfile-dev libxv-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev -y
 ```
