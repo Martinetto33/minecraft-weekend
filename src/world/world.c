@@ -1,7 +1,13 @@
+#include "../cuda/hpc.h"
 #include "../state.h"
 #include "world.h"
 #include "light.h"
 #include "../util/sort.h"
+
+/* ALIN: adding macro for chunks_size */
+#ifndef ALIN_CHUNKS_SIZE
+#define ALIN_CHUNKS_SIZE 16
+#endif
 
 // the total number of chunks in _w->chunks
 #define NUM_CHUNKS(_w) ((_w)->chunks_size * (_w)->chunks_size * (_w)->chunks_size)
@@ -241,7 +247,8 @@ void world_init(struct World *self) {
     self->unloaded_blocks.capacity = 64;
     self->unloaded_blocks.list = malloc(self->unloaded_blocks.capacity * sizeof(struct WorldUnloadedBlock));
 
-    self->chunks_size = 16;
+    /* 	ALIN: this is the line where the chunks_size is set. */
+    self->chunks_size = ALIN_CHUNKS_SIZE;
     self->chunks = calloc(1, NUM_CHUNKS(self) * sizeof(struct Chunk *));
     self->heightmaps = calloc(1, NUM_HEIGHTMAPS(self) * sizeof(struct Heightmap *));
 
@@ -292,8 +299,16 @@ void world_remove_unloaded_block(struct World *self, size_t i) {
     }
 }
 
+/*******************/
+// Added by Alin
+int count_null_chunks(struct World *self);
+/*******************/
+
 // Attempt to load any NULL chunks
 static void load_empty_chunks(struct World *self) {
+  printf("In function load_empty_chunks: empty chunks = %d.\n", count_null_chunks(self));
+  printf("All chunks: %zu\n", self->chunks_size);
+  const double starting_time = hpc_gettime();
     world_foreach_offset_ftb(self, i, offset) {
         if (self->chunks[i] == NULL &&
             self->throttles.load.count < self->throttles.load.max) {
@@ -301,6 +316,25 @@ static void load_empty_chunks(struct World *self) {
             self->throttles.load.count++;
         }
     }
+  const double end_time = hpc_gettime();
+  const double elapsed_time = end_time - starting_time;
+  printf("Elapsed time: %f\n", elapsed_time);
+  printf("Empty chunks after generation = %d.\n", count_null_chunks(self));
+}
+
+// ALIN
+// Counts the null chunks in the world struct.
+int count_null_chunks(struct World *self) {
+  int count = 0;
+  //printf("Chunks_size: %zu\n", self->chunks_size);
+  int total_chunks = pow(self->chunks_size, 3);
+  //	printf("Total chunks: %d\n", total_chunks);
+  for (size_t i = 0; i < total_chunks; i++) {
+    if (self->chunks[i] == NULL) {
+      count++;
+    }
+  }
+  return count;
 }
 
 // Centers the world's loaded chunks around the specified block position

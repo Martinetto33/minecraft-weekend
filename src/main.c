@@ -109,7 +109,7 @@ void render() {
 }
 
 int main(int argc, char *argv[]) {
-    cuda_circles_main();
+    //cuda_circles_main();
     window_create(init, destroy, tick, update, render);
     window_loop();
 }

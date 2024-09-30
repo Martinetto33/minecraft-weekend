@@ -70,7 +70,7 @@ struct World {
     size_t chunks_size;
 
     // Array of chunks in this world, size is always chunks_size ^ 3
-    // Chunk pointers canbe NULL if they are not yet loaded
+    // Chunk pointers can be NULL if they are not yet loaded
     struct Chunk **chunks;
 
     // Bottom-left offset of chunks array and offset of the center chunk
