@@ -1,11 +1,19 @@
 UNAME_S = $(shell uname -s)
 
+# You can change this by running `make CHUNKS_SIZE=N', where N is a positive integer.
+# For some values of N (such as values greater than 64), the program may go
+# in segmentation fault due to too many chunks being generated.
+# You need to run `make clean' before being able to change this variable.
+CHUNKS_SIZE ?= 16
+
 CC = nvcc
 CFLAGS = -std=c++17 -O3 -g -Xcompiler "-Wall -Wextra -Wpedantic -Wstrict-aliasing"
 #CFLAGS += -Wno-pointer-arith -Wno-newline-eof -Wno-unused-parameter -Wno-gnu-statement-expression
 #CFLAGS += -Wno-gnu-compound-literal-initializer -Wno-gnu-zero-variadic-macro-arguments
 CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise #-fbracket-depth=1024
 #CFLAGS += -Wno-error=implicit-function-declaration
+# Adding the environmental variable ALIN_CHUNKS_SIZE as a compilation flag; it's used in the world/world.c file
+CFLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
 LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/usr/local/cuda/lib64 -lcudart
 
 # GLFW required frameworks on OSX
