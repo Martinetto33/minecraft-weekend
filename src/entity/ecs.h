@@ -3,6 +3,16 @@
 
 #include "../util/util.h"
 
+/** Code to try to define a C-like null equivalent in C++/CUDA code... */
+#ifndef __null
+  #ifdef __cplusplus
+    #define __null 0
+  #else
+    #define __null ((void*)0)
+  #endif
+#endif
+
+
 // forward declarations
 struct World;
 
