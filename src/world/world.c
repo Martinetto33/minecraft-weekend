@@ -301,6 +301,8 @@ void world_remove_unloaded_block(struct World *self, size_t i) {
 
 /*******************/
 // Added by Alin
+// Remember: the static modifier in C means that only code in this file can
+// call that function
 int count_null_chunks(struct World *self);
 /*******************/
 
