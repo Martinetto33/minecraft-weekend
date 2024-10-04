@@ -212,7 +212,7 @@ const f32 MOISTURE_MAP[] = {
 // h = height, [-1, 1]
 // m = moisture, [0, 1]
 // t = temperature [0, 1]
-// i = mountain noise [0, 1]
+// n = mountain noise [0, 1]
 // i = modified heightmap noise [0, 1]
 static enum Biome get_biome(f32 h, f32 m, f32 t, f32 n, f32 i) {
     if (h <= 0.0f || n <= 0.0f) {
