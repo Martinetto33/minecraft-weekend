@@ -7,34 +7,6 @@
 extern "C" {
 #endif
 
-    enum BlockId {
-        AIR = 0,
-        GRASS = 1,
-        DIRT = 2,
-        STONE = 3,
-        SAND = 4,
-        WATER = 5,
-        GLASS = 6,
-        LOG = 7,
-        LEAVES = 8,
-        ROSE = 9,
-        BUTTERCUP = 10,
-        COAL = 11,
-        COPPER = 12,
-        LAVA = 13,
-        CLAY = 14,
-        GRAVEL = 15,
-        PLANKS = 16,
-        TORCH = 17,
-        COBBLESTONE = 18,
-        SNOW = 19,
-        PODZOL = 20,
-        SHRUB = 21,
-        TALLGRASS = 22,
-        PINE_LOG = 23,
-        PINE_LEAVES = 24
-    };
-
 #define BIOME_LAST MOUNTAIN
     enum Biome {
         OCEAN,
@@ -60,7 +32,7 @@ extern "C" {
     };
 
     struct BiomeData {
-        enum BlockId top_block, bottom_block;
+        enum CudaBlockId top_block, bottom_block;
         float roughness, scale, exp;
         struct Decoration decorations[MAX_DECORATIONS];
     };
