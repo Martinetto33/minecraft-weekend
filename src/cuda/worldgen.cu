@@ -232,6 +232,22 @@ extern "C" {
         return BIOME_TABLE[m_i][t_i];
     }
 
+    /*
+     * This function generates blocks for a single chunk.
+     * */
+    CUDA_RESULT generateBlocks(int chunk_size_x, int chunk_size_y, int chunk_size_z,
+                               int chunk_world_position_x, int chunk_world_position_y, int chunk_world_position_z,
+                               unsigned long world_seed, long hash,
+                               bool must_generate_heightmap) {
+      // TODO
+
+      return CUDA_RESULT {
+        .blocks_number = 0, // try to put only the useful blocks here
+        .blocks = nullptr,
+        .heightmap = nullptr
+      };
+    }
+
 #ifdef __cplusplus
 }
 #endif
