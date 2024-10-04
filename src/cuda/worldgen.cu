@@ -1,5 +1,8 @@
 #include "hpc.h"
 #include "cuda-worldgen.h"
+#include "cuda-utils.h"
+#include <curand.h>
+#include <curand_kernel.h>
 
 #define BLKDIM 1024
 
@@ -240,7 +243,8 @@ extern "C" {
                                unsigned long world_seed, long hash,
                                bool must_generate_heightmap) {
       // TODO
-
+      // SRAND cannot be used; curand is the official CUDA function adopted for random number generation.
+      // SRAND(world_seed + hash);
       return CUDA_RESULT {
         .blocks_number = 0, // try to put only the useful blocks here
         .blocks = nullptr,

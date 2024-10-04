@@ -191,7 +191,7 @@ extern "C" { // used to avoid name mangling, and thus allowing to call this code
         int n_intersections = 0;
         /* Main body of the function. */
         for (int i = 0; i < ncircles; i++) {
-            compute_forces_kernel<<<number_of_blocks, BLKDIM>>>
+            compute_forces_kernel<<<number_of_blocks, BLKDIM>>> // qui è dove il prof diceva che si potevano lanciare meno thread (ncircles - i)
             (d_circles, i,d_array_of_partial_results,number_of_blocks);
             cudaCheckError();
         }
