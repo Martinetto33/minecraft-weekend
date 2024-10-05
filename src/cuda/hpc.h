@@ -61,7 +61,19 @@ double hpc_gettime( void )
 #endif
 #include <time.h>
 
-double hpc_gettime( void )
+/* The inline modifier allows this function to be present in multiple translation
+ * units (i.e. .c or .cu files) without causing issues at link time. Since the function
+ * definition (that is, its body) is directly coded in this file, then multiple definition
+ * errors could occur when linking .o files since each file includes all the content of
+ * this file when hpc.h is included.
+ * This increases a bit the size of the codebase, but at link time there won't be
+ * multiple definitions of this function.
+ * When specifying a function as inlined, we're suggesting that the compiler should
+ * copy directly the code of the function in the places where the function is called.
+ * This avoids the overhead of calling a different function and might be suitable for
+ * small, frequently called functions, like this one is.
+ */
+inline double hpc_gettime( void )
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts );

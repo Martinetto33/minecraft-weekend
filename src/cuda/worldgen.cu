@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define BIOME_LAST MOUNTAIN
-    enum Biome {
+    __host__ __device__ enum Biome {
         OCEAN,
         RIVER,
         BEACH,
@@ -29,18 +29,18 @@ extern "C" {
     };
 
 #define MAX_DECORATIONS 8
-    struct Decoration {
+    __host__ __device__ struct Decoration {
         //FWGDecorate f;
         float chance;
     };
 
-    struct BiomeData {
+    __host__ __device__ struct BiomeData {
         enum CudaBlockId top_block, bottom_block;
         float roughness, scale, exp;
         struct Decoration decorations[MAX_DECORATIONS];
     };
 
-    struct BiomeData BIOME_DATA[BIOME_LAST + 1] = {
+    __host__ __device__ struct BiomeData BIOME_DATA[BIOME_LAST + 1] = {
     [OCEAN] = {
         .top_block = SAND,
         .bottom_block = SAND,
@@ -182,7 +182,7 @@ extern "C" {
     },
 };
 
-    const enum Biome BIOME_TABLE[6][6] = {
+    __host__ __device__ const enum Biome BIOME_TABLE[6][6] = {
         { ICE, TUNDRA, GRASSLAND,   DESERT,     DESERT,     DESERT },
         { ICE, TUNDRA, GRASSLAND,   GRASSLAND,  DESERT,     DESERT },
         { ICE, TUNDRA, WOODLAND,    WOODLAND,   SAVANNA,    SAVANNA },
@@ -191,7 +191,7 @@ extern "C" {
         { ICE, TUNDRA, TAIGA,       TAIGA,      JUNGLE,     JUNGLE }
     };
 
-    const float HEAT_MAP[] = {
+    __host__ __device__ const float HEAT_MAP[] = {
         0.05f,
         0.18f,
         0.4f,
@@ -199,7 +199,7 @@ extern "C" {
         0.8f
     };
 
-    const float MOISTURE_MAP[] = {
+    __host__ __device__ const float MOISTURE_MAP[] = {
         0.2f,
         0.3f,
         0.5f,
