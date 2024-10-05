@@ -21,7 +21,7 @@ extern "C" {
 
     // Combined noise where compute(x, z) = n.compute(x + m.compute(x, z), z)
     struct Combined {
-        struct Noise *n, *m;
+        Noise *n, *m;
     };
 
     struct Basic {
@@ -29,14 +29,14 @@ extern "C" {
     };
 
     struct ExpScale {
-        struct Noise *n;
-        int exp, scale;
+        Noise *n;
+        float exp, scale;
     };
 
-    struct Noise octave(int n, int o);
-    struct Noise combined(struct Noise *n, struct Noise *m);
-    struct Noise basic(int o);
-    struct Noise expscale(struct Noise *n, float exp, float scale);
+    Noise cuda_octave(int n, int o);
+    Noise cuda_combined(Noise *n, Noise *m);
+    Noise cuda_basic(int o);
+    Noise cuda_expscale(Noise *n, float exp, float scale);
 
 #ifdef __cplusplus
 }
