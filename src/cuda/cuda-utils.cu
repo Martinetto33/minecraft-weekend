@@ -28,6 +28,7 @@ extern "C" {
         const int total_threads = threads_per_block * number_of_blocks;
         cudaSafeCall(cudaMalloc((void**)&d_States, total_threads * sizeof(curandState)));
         init_random_kernel<<<number_of_blocks, threads_per_block>>>(world_seed, hash, d_States);
+        cudaCheckError();
         return d_States;
     }
 
@@ -43,6 +44,10 @@ extern "C" {
       for (int i = 0; i < 10 * 10; i++) {
         printf("h_random_longs[%d] = %lu\n", i, h_random_longs[i]);
       }
+    }
+
+    int calculate_gpu_blocks(int number_of_blocks_to_generate) {
+      return (number_of_blocks_to_generate + BLKDIM - 1) / BLKDIM;
     }
 
 #ifdef __cplusplus

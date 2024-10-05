@@ -27,7 +27,7 @@ endif
 
 SRC  = $(wildcard src/**/*.c) $(wildcard src/*.c) $(wildcard src/**/**/*.c) $(wildcard src/**/**/**/*.c)
 OBJ  = $(SRC:.c=.o)
-CUDA_SRC = $(wildcard src/cuda/*.cu)
+CUDA_SRC = $(wildcard src/cuda/*.cu) $(wildcard src/cuda/noise/*.cu)
 CUDA_OBJ = $(CUDA_SRC:.cu=.o)
 OBJ += $(CUDA_OBJ)
 BIN = bin

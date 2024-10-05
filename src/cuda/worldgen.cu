@@ -243,12 +243,22 @@ extern "C" {
                                unsigned long world_seed, long hash,
                                bool must_generate_heightmap) {
       // TODO
-      // SRAND cannot be used; curand is the official CUDA function adopted for random number generation.
-      // SRAND(world_seed + hash);
+	  // How many world blocks should be generated?
+      const int blocks_to_generate = chunk_size_x * chunk_size_y * chunk_size_z;
+      // How many GPU blocks should be allocated for the computation?
+      const int gpu_blocks = calculate_gpu_blocks(blocks_to_generate);
+      init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
+
+      int *heightmap = (int *)malloc(chunk_size_x * chunk_size_z * sizeof(int)); // generating a y column height for each position (x, z)
+
+      if (must_generate_heightmap) {
+
+      }
+
       return CUDA_RESULT {
         .blocks_number = 0, // try to put only the useful blocks here
         .blocks = nullptr,
-        .heightmap = nullptr
+        .heightmap = heightmap
       };
     }
 
