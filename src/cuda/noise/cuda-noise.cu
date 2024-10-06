@@ -9,12 +9,12 @@ extern "C" {
 #define EPSILON 0.000001f // for float comparison
 
 // This is the new and improved, C(2) continuous interpolant
-#define FADE(t) ( t * t * t * ( t * ( t * 6 - 15 ) + 10 ) )
+#define CUDA_FADE(t) ( t * t * t * ( t * ( t * 6 - 15 ) + 10 ) )
 
-#define FASTFLOOR(x) ( ((int)(x)<(x)) ? ((int)x) : ((int)x-1 ) )
-#define LERP(t, a, b) ((a) + (t)*((b)-(a)))
+#define CUDA_FASTFLOOR(x) ( ((int)(x)<(x)) ? ((int)x) : ((int)x-1 ) )
+#define CUDA_LERP(t, a, b) ((a) + (t)*((b)-(a)))
 
-    __device__ unsigned char perm[] = {151,160,137,91,90,15,
+    __device__ unsigned char cuda_perm[] = {151,160,137,91,90,15,
   131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
   190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
   88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
@@ -42,7 +42,7 @@ extern "C" {
   138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
 };
 
-    __device__ float grad3( int hash, float x, float y , float z ) {
+    __device__ float cuda_grad3( int hash, float x, float y , float z ) {
         int h = hash & 15;     // Convert low 4 bits of hash code into 12 simple
         float u = h<8 ? x : y; // gradient directions, and compute dot product.
         float v = h<4 ? y : h==12||h==14 ? x : z; // Fix repeats at h = 12 to 15
@@ -52,16 +52,16 @@ extern "C" {
     //---------------------------------------------------------------------
     /** 3D float Perlin noise.
      */
-    __device__ float noise3( float x, float y, float z )
+    __device__ float cuda_noise3( float x, float y, float z )
     {
         int ix0, iy0, ix1, iy1, iz0, iz1;
         float fx0, fy0, fz0, fx1, fy1, fz1;
         float s, t, r;
         float nxy0, nxy1, nx0, nx1, n0, n1;
 
-        ix0 = FASTFLOOR( x ); // Integer part of x
-        iy0 = FASTFLOOR( y ); // Integer part of y
-        iz0 = FASTFLOOR( z ); // Integer part of z
+        ix0 = CUDA_FASTFLOOR( x ); // Integer part of x
+        iy0 = CUDA_FASTFLOOR( y ); // Integer part of y
+        iz0 = CUDA_FASTFLOOR( z ); // Integer part of z
         fx0 = x - ix0;        // Fractional part of x
         fy0 = y - iy0;        // Fractional part of y
         fz0 = z - iz0;        // Fractional part of z
@@ -75,31 +75,31 @@ extern "C" {
         iy0 = iy0 & 0xff;
         iz0 = iz0 & 0xff;
 
-        r = FADE( fz0 );
-        t = FADE( fy0 );
-        s = FADE( fx0 );
+        r = CUDA_FADE( fz0 );
+        t = CUDA_FADE( fy0 );
+        s = CUDA_FADE( fx0 );
 
-        nxy0 = grad3(perm[ix0 + perm[iy0 + perm[iz0]]], fx0, fy0, fz0);
-        nxy1 = grad3(perm[ix0 + perm[iy0 + perm[iz1]]], fx0, fy0, fz1);
-        nx0 = LERP( r, nxy0, nxy1 );
+        nxy0 = cuda_grad3(cuda_perm[ix0 + cuda_perm[iy0 + cuda_perm[iz0]]], fx0, fy0, fz0);
+        nxy1 = cuda_grad3(cuda_perm[ix0 + cuda_perm[iy0 + cuda_perm[iz1]]], fx0, fy0, fz1);
+        nx0 = CUDA_LERP( r, nxy0, nxy1 );
 
-        nxy0 = grad3(perm[ix0 + perm[iy1 + perm[iz0]]], fx0, fy1, fz0);
-        nxy1 = grad3(perm[ix0 + perm[iy1 + perm[iz1]]], fx0, fy1, fz1);
-        nx1 = LERP( r, nxy0, nxy1 );
+        nxy0 = cuda_grad3(cuda_perm[ix0 + cuda_perm[iy1 + cuda_perm[iz0]]], fx0, fy1, fz0);
+        nxy1 = cuda_grad3(cuda_perm[ix0 + cuda_perm[iy1 + cuda_perm[iz1]]], fx0, fy1, fz1);
+        nx1 = CUDA_LERP( r, nxy0, nxy1 );
 
-        n0 = LERP( t, nx0, nx1 );
+        n0 = CUDA_LERP( t, nx0, nx1 );
 
-        nxy0 = grad3(perm[ix1 + perm[iy0 + perm[iz0]]], fx1, fy0, fz0);
-        nxy1 = grad3(perm[ix1 + perm[iy0 + perm[iz1]]], fx1, fy0, fz1);
-        nx0 = LERP( r, nxy0, nxy1 );
+        nxy0 = cuda_grad3(cuda_perm[ix1 + cuda_perm[iy0 + cuda_perm[iz0]]], fx1, fy0, fz0);
+        nxy1 = cuda_grad3(cuda_perm[ix1 + cuda_perm[iy0 + cuda_perm[iz1]]], fx1, fy0, fz1);
+        nx0 = CUDA_LERP( r, nxy0, nxy1 );
 
-        nxy0 = grad3(perm[ix1 + perm[iy1 + perm[iz0]]], fx1, fy1, fz0);
-        nxy1 = grad3(perm[ix1 + perm[iy1 + perm[iz1]]], fx1, fy1, fz1);
-        nx1 = LERP( r, nxy0, nxy1 );
+        nxy0 = cuda_grad3(cuda_perm[ix1 + cuda_perm[iy1 + cuda_perm[iz0]]], fx1, fy1, fz0);
+        nxy1 = cuda_grad3(cuda_perm[ix1 + cuda_perm[iy1 + cuda_perm[iz1]]], fx1, fy1, fz1);
+        nx1 = CUDA_LERP( r, nxy0, nxy1 );
 
-        n1 = LERP( t, nx0, nx1 );
+        n1 = CUDA_LERP( t, nx0, nx1 );
 
-        return 0.936f * ( LERP( s, n0, n1 ) );
+        return 0.936f * ( CUDA_LERP( s, n0, n1 ) );
     }
 
     //---------------------------------------------------------------------
@@ -108,53 +108,53 @@ extern "C" {
         return (n > EPSILON) - (n < -EPSILON);
     }
 
-    __device__ float cuda_octave_compute(const Octave *p, const float seed, const float x, const float z) {
+    __device__ float cuda_octave_compute(const CudaOctave *p, const float seed, const float x, const float z) {
         float u = 1.0f, v = 0.0f;
         for (int i = 0; i < p->n; i++) {
-            v += (1.0f / u) * noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (p->o * 32));
+            v += (1.0f / u) * cuda_noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (p->o * 32));
             u *= 2.0f;
         }
         return v;
     }
 
     __device__ CudaNoise cuda_octave(int n, int o) {
-        CudaNoise result = {.compute = reinterpret_cast<FNoise>(cuda_octave_compute)};
-        const Octave params = {n, o};
-        memcpy(&result.params, &params, sizeof(Octave));
+        CudaNoise result = {.compute = (CudaFNoise) cuda_octave_compute};
+        const CudaOctave params = {n, o};
+        memcpy(&result.params, &params, sizeof(CudaOctave));
         return result;
     }
 
-    __device__ float cuda_combined_compute(const Combined *p, const float seed, const float x, const float z) {
+    __device__ float cuda_combined_compute(const CudaCombined *p, const float seed, const float x, const float z) {
         return p->n->compute(&p->n->params, seed, x + p->m->compute(&p->m->params, seed, x, z), z);
     }
 
     __device__ CudaNoise cuda_combined(CudaNoise *n, CudaNoise *m) {
-        CudaNoise result = {.compute = reinterpret_cast<FNoise>(cuda_combined_compute)};
-        const Combined params = {n, m};
-        memcpy(&result.params, &params, sizeof(Combined));
+        CudaNoise result = {.compute = (CudaFNoise) cuda_combined_compute};
+        const CudaCombined params = {n, m};
+        memcpy(&result.params, &params, sizeof(CudaCombined));
         return result;
     }
 
     __device__ float cuda_noise_compute(const Basic *b, const float seed, const float x, const float z) {
-        return noise3(x, z, seed + (b->o * 32.0f));
+        return cuda_noise3(x, z, seed + (b->o * 32.0f));
     }
 
     __device__ CudaNoise cuda_basic(const int o) {
-        CudaNoise result = {.compute = reinterpret_cast<FNoise>(cuda_noise_compute) };
+        CudaNoise result = {.compute = (CudaFNoise) cuda_noise_compute };
         const Basic params = { .o = o };
         memcpy(&result.params, &params, sizeof(Basic));
         return result;
     }
 
-    __device__ float cuda_expscale_compute(const ExpScale *e, const float seed, const float x, const float z) {
+    __device__ float cuda_expscale_compute(const CudaExpScale *e, const float seed, const float x, const float z) {
         const float n = e->n->compute(&e->n->params, seed, x * e->scale, z * e->scale);
         return sign(n) * powf(fabsf(n), e->exp);
     }
 
     __device__ CudaNoise cuda_expscale(CudaNoise *n, float exp, float scale) {
-        CudaNoise result = {.compute = reinterpret_cast<FNoise>(cuda_expscale_compute) };
-        const ExpScale params = { .n = n, .exp = exp, .scale = scale };
-        memcpy(&result.params, &params, sizeof(ExpScale));
+        CudaNoise result = {.compute = (CudaFNoise) cuda_expscale_compute };
+        const CudaExpScale params = { .n = n, .exp = exp, .scale = scale };
+        memcpy(&result.params, &params, sizeof(CudaExpScale));
         return result;
     }
 

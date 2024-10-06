@@ -5,22 +5,22 @@
 extern "C" {
 #endif
 
-    typedef float (*FNoise)(void *p, float s, float x, float z);
+    typedef float (*CudaFNoise)(void *p, float s, float x, float z);
 
     struct CudaNoise {
         unsigned char params[512];
-        FNoise compute;
+        CudaFNoise compute;
     };
 
     // Octave noise with n octaves and seed offset o
     // Maximum amplitude is 2^0 + 2^1 + 2^2 ... 2^n = 2^(n+1) - 1
     // i.e. for octave 8, values range between [-511, 511]
-    struct Octave {
+    struct CudaOctave {
         int n, o;
     };
 
     // Combined noise where compute(x, z) = n.compute(x + m.compute(x, z), z)
-    struct Combined {
+    struct CudaCombined {
         CudaNoise *n, *m;
     };
 
@@ -28,7 +28,7 @@ extern "C" {
         int o;
     };
 
-        struct ExpScale {
+    struct CudaExpScale {
         CudaNoise *n;
         float exp, scale;
     };
