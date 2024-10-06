@@ -7,7 +7,7 @@ extern "C" {
 
     typedef float (*FNoise)(void *p, float s, float x, float z);
 
-    struct Noise {
+    struct CudaNoise {
         unsigned char params[512];
         FNoise compute;
     };
@@ -21,22 +21,22 @@ extern "C" {
 
     // Combined noise where compute(x, z) = n.compute(x + m.compute(x, z), z)
     struct Combined {
-        Noise *n, *m;
+        CudaNoise *n, *m;
     };
 
     struct Basic {
         int o;
     };
 
-    struct ExpScale {
-        Noise *n;
+        struct ExpScale {
+        CudaNoise *n;
         float exp, scale;
     };
 
-    Noise cuda_octave(int n, int o);
-    Noise cuda_combined(Noise *n, Noise *m);
-    Noise cuda_basic(int o);
-    Noise cuda_expscale(Noise *n, float exp, float scale);
+    __device__ CudaNoise cuda_octave(int n, int o);
+    __device__ CudaNoise cuda_combined(CudaNoise *n, CudaNoise *m);
+    __device__ CudaNoise cuda_basic(int o);
+    __device__ CudaNoise cuda_expscale(CudaNoise *n, float exp, float scale);
 
 #ifdef __cplusplus
 }

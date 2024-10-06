@@ -5,7 +5,7 @@
 
 typedef f32 (*FNoise)(void *p, f32 s, f32 x, f32 z);
 
-struct Noise {
+struct CudaNoise {
     u8 params[512];
     FNoise compute;
 };
@@ -19,7 +19,7 @@ struct Octave {
 
 // Combined noise where compute(x, z) = n.compute(x + m.compute(x, z), z)
 struct Combined {
-    struct Noise *n, *m;
+    struct CudaNoise *n, *m;
 };
 
 struct Basic {
@@ -27,13 +27,13 @@ struct Basic {
 };
 
 struct ExpScale {
-    struct Noise *n;
+    struct CudaNoise *n;
     f32 exp, scale;
 };
 
-struct Noise octave(s32 n, s32 o);
-struct Noise combined(struct Noise *n, struct Noise *m);
-struct Noise basic(s32 o);
-struct Noise expscale(struct Noise *n, f32 exp, f32 scale);
+struct CudaNoise octave(s32 n, s32 o);
+struct CudaNoise combined(struct CudaNoise *n, struct CudaNoise *m);
+struct CudaNoise basic(s32 o);
+struct CudaNoise expscale(struct CudaNoise *n, f32 exp, f32 scale);
 
 #endif

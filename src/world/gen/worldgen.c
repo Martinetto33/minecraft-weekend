@@ -7,7 +7,7 @@
 #define RADIAL2I(c, r, v)\
     (glms_vec2_norm(glms_vec2_sub(IVEC2S2V((c)), IVEC2S2V((v)))) / glms_vec2_norm(IVEC2S2V((r))))
 
-#define RADIAL3I(c, r, v)\ 
+#define RADIAL3I(c, r, v)\
     (glms_vec3_norm(glms_vec3_sub(IVEC3S2V((c)), IVEC3S2V((v)))) / glms_vec3_norm(IVEC3S2V((r))))
 
 #define WATER_LEVEL 0
@@ -275,18 +275,18 @@ void worldgen_generate(struct Chunk *chunk) {
     if (!heightmap->flags.generated) {
         heightmap->flags.generated = true;
 
-        struct Noise bs[] = {
+        struct CudaNoise bs[] = {
             basic(1), basic(2),
             basic(3), basic(4)
         };
 
-        struct Noise os[] = {
+        struct CudaNoise os[] = {
             octave(5, 0), octave(5, 1),
             octave(5, 2), octave(5, 3),
             octave(5, 4), octave(5, 5),
         };
 
-        struct Noise cs[] = {
+        struct CudaNoise cs[] = {
             combined(&bs[0], &bs[1]),
             combined(&bs[2], &bs[3]),
             combined(&os[3], &os[4]),
@@ -294,7 +294,7 @@ void worldgen_generate(struct Chunk *chunk) {
             combined(&os[1], &os[3])
         };
 
-        struct Noise
+        struct CudaNoise
             n_h = expscale(&os[0], 1.3f, 1.0f / 128.0f),
             n_m = expscale(&cs[0], 1.0f, 1.0f / 512.0f),
             n_t = expscale(&cs[1], 1.0f, 1.0f / 512.0f),
@@ -307,6 +307,7 @@ void worldgen_generate(struct Chunk *chunk) {
             for (s64 z = 0; z < CHUNK_SIZE.z; z++) {
                 s64 wx = chunk->position.x + x, wz = chunk->position.z + z;
 
+                // The program breaks here.
                 f32 h = n_h.compute(&n_h.params, chunk->world->seed, wx, wz),
                     m = n_m.compute(&n_m.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,
                     t = n_t.compute(&n_t.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,

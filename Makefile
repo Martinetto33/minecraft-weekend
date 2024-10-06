@@ -14,7 +14,7 @@ CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Il
 #CFLAGS += -Wno-error=implicit-function-declaration
 # Adding the environmental variable ALIN_CHUNKS_SIZE as a compilation flag; it's used in the world/world.c file
 CFLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
-LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/usr/local/cuda/lib64 -lcudart
+LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/opt/cuda/nvvm/lib64 -lcudart
 
 # GLFW required frameworks on OSX
 ifeq ($(UNAME_S), Darwin)
@@ -53,10 +53,12 @@ game: $(OBJ)
 
 # Rule for compiling CUDA files with nvcc
 %.o: %.cu
-	$(CC) -c $< -o $@ $(CFLAGS)
+	$(CC) -dc $< -o $@ $(CFLAGS)
 
 %.o: %.c
 	$(CC) -o $@ -c $< $(CFLAGS)
+
+noise: # TODO: ADD RULE TO COMPILE NOISE LIBRARY AND TO LINK IT WITH NVLINK
 
 clean:
 	rm -rf $(BIN) $(OBJ)

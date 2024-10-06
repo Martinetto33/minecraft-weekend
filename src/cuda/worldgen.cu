@@ -2,7 +2,7 @@
 #include "cuda-worldgen.h"
 #include "cuda-utils.h"
 #include <curand.h>
-#include <curand_kernel.h>
+#include "noise/cuda-noise.h"
 
 #define BLKDIM 1024
 
@@ -10,8 +10,14 @@
 extern "C" {
 #endif
 
+__device__ CudaNoise *bs;
+__device__ CudaNoise *os;
+__device__ CudaNoise *cs;
+__device__ CudaNoise *expscales;
+
+
 #define BIOME_LAST MOUNTAIN
-    __host__ __device__ enum Biome {
+    enum CudaBiome {
         OCEAN,
         RIVER,
         BEACH,
@@ -29,18 +35,18 @@ extern "C" {
     };
 
 #define MAX_DECORATIONS 8
-    __host__ __device__ struct Decoration {
+    struct CudaDecoration {
         //FWGDecorate f;
         float chance;
     };
 
-    __host__ __device__ struct BiomeData {
-        enum CudaBlockId top_block, bottom_block;
+    struct CudaBiomeData {
+        CudaBlockId top_block, bottom_block;
         float roughness, scale, exp;
-        struct Decoration decorations[MAX_DECORATIONS];
+        CudaDecoration decorations[MAX_DECORATIONS];
     };
 
-    __host__ __device__ struct BiomeData BIOME_DATA[BIOME_LAST + 1] = {
+    CudaBiomeData CUDA_BIOME_DATA[BIOME_LAST + 1] = {
     [OCEAN] = {
         .top_block = SAND,
         .bottom_block = SAND,
@@ -182,7 +188,7 @@ extern "C" {
     },
 };
 
-    __host__ __device__ const enum Biome BIOME_TABLE[6][6] = {
+    const enum CudaBiome BIOME_TABLE[6][6] = {
         { ICE, TUNDRA, GRASSLAND,   DESERT,     DESERT,     DESERT },
         { ICE, TUNDRA, GRASSLAND,   GRASSLAND,  DESERT,     DESERT },
         { ICE, TUNDRA, WOODLAND,    WOODLAND,   SAVANNA,    SAVANNA },
@@ -191,7 +197,7 @@ extern "C" {
         { ICE, TUNDRA, TAIGA,       TAIGA,      JUNGLE,     JUNGLE }
     };
 
-    __host__ __device__ const float HEAT_MAP[] = {
+    const float HEAT_MAP[] = {
         0.05f,
         0.18f,
         0.4f,
@@ -199,7 +205,7 @@ extern "C" {
         0.8f
     };
 
-    __host__ __device__ const float MOISTURE_MAP[] = {
+    const float MOISTURE_MAP[] = {
         0.2f,
         0.3f,
         0.5f,
@@ -207,7 +213,12 @@ extern "C" {
         0.7f
     };
 
-    __device__ enum Biome get_biome(float h, float m, float t, float n, float i) {
+    /* Tables: */
+	__device__ __constant__ CudaBiome **device_biome_table;
+    __device__ __constant__ float *device_heat_map;
+    __device__ __constant__ float *device_moisture_map;
+
+    __device__ CudaBiome get_biome(float h, float m, float t, float n, float i) {
         if (h <= 0.0f || n <= 0.0f) {
             return OCEAN;
         } else if (h <= 0.005f) {
@@ -221,18 +232,88 @@ extern "C" {
         size_t t_i = 0, m_i = 0;
 
         for (; t_i < 4; t_i++) {
-            if (t <= HEAT_MAP[t_i]) {
+            if (t <= device_heat_map[t_i]) {
                 break;
             }
         }
 
         for (; m_i < 4; m_i++) {
-            if (m <= MOISTURE_MAP[m_i]) {
+            if (m <= device_moisture_map[m_i]) {
                 break;
             }
         }
 
-        return BIOME_TABLE[m_i][t_i];
+        return device_biome_table[m_i][t_i];
+    }
+
+    __global__ void generate_noise() {
+        bs[0] = cuda_basic(1);
+        bs[1] = cuda_basic(2);
+        bs[2] = cuda_basic(3);
+        bs[3] = cuda_basic(4);
+
+        os[0] = cuda_octave(5, 0);
+        os[1] = cuda_octave(5, 1);
+        os[2] = cuda_octave(5, 2);
+        os[3] = cuda_octave(5, 3);
+        os[4] = cuda_octave(5, 4);
+        os[5] = cuda_octave(5, 5);
+
+        cs[0] = cuda_combined(&bs[0], &bs[1]);
+        cs[1] = cuda_combined(&bs[2], &bs[3]);
+        cs[2] = cuda_combined(&os[3], &os[4]);
+        cs[3] = cuda_combined(&os[1], &os[2]);
+        cs[4] = cuda_combined(&os[1], &os[3]);
+
+        expscales[0] = cuda_expscale(&os[0], 1.3f, 1.0f / 128.0f); // n_h
+        expscales[1] = cuda_expscale(&cs[0], 1.0f, 1.0f / 512.0f); // n_m
+        expscales[2] = cuda_expscale(&cs[1], 1.0f, 1.0f / 512.0f); // n_t
+        expscales[3] = cuda_expscale(&cs[2], 1.0f, 1.0f / 16.0f); // n_r
+        expscales[4] = cuda_expscale(&cs[3], 3.0f, 1.0f / 512.0f); // n_n
+        expscales[5] = cuda_expscale(&cs[4], 3.0f, 1.0f / 512.0f); // n_p
+    }
+
+    void initialise_tables() {
+      // First allocating an array of pointers
+      cudaSafeCall(cudaMalloc((void**)&device_biome_table, 6 * sizeof(enum CudaBiome*)));
+      // Now for each pointer, we allocate space for 6 enum elements
+      for (int i = 0; i < 6; i++) {
+        cudaSafeCall(cudaMalloc((void**)&device_biome_table[i], 6 * sizeof(enum CudaBiome)));
+      }
+      cudaSafeCall(cudaMalloc((void**)&device_heat_map, 6 * sizeof(float)));
+      cudaSafeCall(cudaMalloc((void**)&device_moisture_map, 6 * sizeof(float)));
+
+      // Now copying data from host to device
+	  for (int i = 0; i < 6; i++) {
+        cudaSafeCall(cudaMemcpyToSymbol((*(&device_biome_table[i])), BIOME_TABLE[i], 6 * sizeof(enum CudaBiome), 0));
+	  }
+      cudaSafeCall(cudaMemcpyToSymbol((*(&device_heat_map)), HEAT_MAP, 5 * sizeof(float), 0));
+      cudaSafeCall(cudaMemcpyToSymbol((*(&device_moisture_map)), MOISTURE_MAP, 5 * sizeof(float), 0));
+    }
+
+    void destroy_tables() {
+      for (int i = 0; i < 6; i++) {
+        cudaFree(device_biome_table[i]);
+      }
+      cudaFree(device_biome_table);
+      cudaFree(device_heat_map);
+      cudaFree(device_moisture_map);
+    }
+
+    void initialise_noise_arrays() {
+      cudaSafeCall(cudaMalloc((void**)&bs, 4 * sizeof(struct CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&os, 6 * sizeof(struct CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&cs, 5 * sizeof(struct CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&expscales, 6 * sizeof(struct CudaNoise)));
+      generate_noise<<<1,1>>>();
+      cudaCheckError();
+    }
+
+    void destroy_noise_arrays() {
+      cudaFree(bs);
+      cudaFree(os);
+      cudaFree(cs);
+      cudaFree(expscales);
     }
 
     /*
@@ -252,7 +333,13 @@ extern "C" {
       int *heightmap = (int *)malloc(chunk_size_x * chunk_size_z * sizeof(int)); // generating a y column height for each position (x, z)
 
       if (must_generate_heightmap) {
+        initialise_tables();
+        initialise_noise_arrays();
 
+
+
+        destroy_tables();
+        destroy_noise_arrays();
       }
 
       return CUDA_RESULT {
