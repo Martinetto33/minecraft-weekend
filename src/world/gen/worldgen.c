@@ -275,18 +275,18 @@ void worldgen_generate(struct Chunk *chunk) {
     if (!heightmap->flags.generated) {
         heightmap->flags.generated = true;
 
-        struct CudaNoise bs[] = {
+        struct Noise bs[] = {
             basic(1), basic(2),
             basic(3), basic(4)
         };
 
-        struct CudaNoise os[] = {
+        struct Noise os[] = {
             octave(5, 0), octave(5, 1),
             octave(5, 2), octave(5, 3),
             octave(5, 4), octave(5, 5),
         };
 
-        struct CudaNoise cs[] = {
+        struct Noise cs[] = {
             combined(&bs[0], &bs[1]),
             combined(&bs[2], &bs[3]),
             combined(&os[3], &os[4]),
@@ -294,7 +294,7 @@ void worldgen_generate(struct Chunk *chunk) {
             combined(&os[1], &os[3])
         };
 
-        struct CudaNoise
+        struct Noise
             n_h = expscale(&os[0], 1.3f, 1.0f / 128.0f),
             n_m = expscale(&cs[0], 1.0f, 1.0f / 512.0f),
             n_t = expscale(&cs[1], 1.0f, 1.0f / 512.0f),
@@ -302,12 +302,11 @@ void worldgen_generate(struct Chunk *chunk) {
             n_n = expscale(&cs[3], 3.0f, 1.0f / 512.0f),
             n_p = expscale(&cs[4], 3.0f, 1.0f / 512.0f);
 
-        /* TODO: potentially parallelisable code! */
         for (s64 x = 0; x < CHUNK_SIZE.x; x++) {
             for (s64 z = 0; z < CHUNK_SIZE.z; z++) {
                 s64 wx = chunk->position.x + x, wz = chunk->position.z + z;
 
-                // The program breaks here.
+                // TODO: The program breaks here.
                 f32 h = n_h.compute(&n_h.params, chunk->world->seed, wx, wz),
                     m = n_m.compute(&n_m.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,
                     t = n_t.compute(&n_t.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,

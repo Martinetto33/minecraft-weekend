@@ -58,7 +58,5 @@ game: $(OBJ)
 %.o: %.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
-noise: # TODO: ADD RULE TO COMPILE NOISE LIBRARY AND TO LINK IT WITH NVLINK
-
 clean:
 	rm -rf $(BIN) $(OBJ)
