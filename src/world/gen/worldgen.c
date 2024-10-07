@@ -306,7 +306,6 @@ void worldgen_generate(struct Chunk *chunk) {
             for (s64 z = 0; z < CHUNK_SIZE.z; z++) {
                 s64 wx = chunk->position.x + x, wz = chunk->position.z + z;
 
-                // TODO: The program breaks here.
                 f32 h = n_h.compute(&n_h.params, chunk->world->seed, wx, wz),
                     m = n_m.compute(&n_m.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,
                     t = n_t.compute(&n_t.params, chunk->world->seed, wx, wz) * 0.5f + 0.5f,

@@ -35,6 +35,11 @@ extern "C" {
         PINE_LEAVES = 24
     };
 
+    typedef struct CudaWorldgenData {
+        float h_b;
+        long h, b;
+    } CUDA_WORLDGEN_DATA;
+
     /*
      * A structure containing the heightmap values (stored as a simple array of all the y
      * heights in this chunk) and the blocks calculated by the GPU.
@@ -46,6 +51,7 @@ extern "C" {
         int blocks_number;
         CudaBlockId *blocks;
         int *heightmap;
+        CUDA_WORLDGEN_DATA *data;
     } CUDA_RESULT;
 
     /*

@@ -9,6 +9,29 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#ifndef EPSILON
+#define EPSILON 0.000001f // for float comparison
+#endif
+#define N_H 0
+#define N_M 1
+#define N_T 2
+#define N_R 3
+#define N_N 4
+#define N_P 5
+#ifndef safe_expf
+#define safe_expf(_x, _e) ({ __typeof__(_x) __x = (_x); __typeof__(_e) __e = (_e); sign(__x) * fabsf(powf(fabsf(__x), __e)); })
+#endif
+#ifndef clamp
+#define clamp(x, mn, mx) ({\
+__typeof__ (x) _x = (x); \
+__typeof__ (mn) _mn = (mn); \
+__typeof__ (mx) _mx = (mx); \
+max(_mn, min(_mx, _x)); })
+#endif
+
+    __device__ static int sign(const float n) {
+        return (n > EPSILON) - (n < -EPSILON);
+    }
 
 __device__ CudaNoise *bs;
 __device__ CudaNoise *os;
@@ -188,7 +211,7 @@ __device__ CudaNoise *expscales;
     },
 };
 
-    const enum CudaBiome BIOME_TABLE[6][6] = {
+    const CudaBiome BIOME_TABLE[6][6] = {
         { ICE, TUNDRA, GRASSLAND,   DESERT,     DESERT,     DESERT },
         { ICE, TUNDRA, GRASSLAND,   GRASSLAND,  DESERT,     DESERT },
         { ICE, TUNDRA, WOODLAND,    WOODLAND,   SAVANNA,    SAVANNA },
@@ -215,13 +238,16 @@ __device__ CudaNoise *expscales;
 
     /* Tables: */
 	__device__ __constant__ CudaBiome **device_biome_table;
+    __device__ __constant__ CudaBiomeData *device_biome_data;
     __device__ __constant__ float *device_heat_map;
     __device__ __constant__ float *device_moisture_map;
 
     __device__ CudaBiome get_biome(float h, float m, float t, float n, float i) {
         if (h <= 0.0f || n <= 0.0f) {
             return OCEAN;
-        } else if (h <= 0.005f) {
+        }
+
+        if (h <= 0.005f) {
             return BEACH;
         }
 
@@ -265,13 +291,15 @@ __device__ CudaNoise *expscales;
         cs[3] = cuda_combined(&os[1], &os[2]);
         cs[4] = cuda_combined(&os[1], &os[3]);
 
-        expscales[0] = cuda_expscale(&os[0], 1.3f, 1.0f / 128.0f); // n_h
-        expscales[1] = cuda_expscale(&cs[0], 1.0f, 1.0f / 512.0f); // n_m
-        expscales[2] = cuda_expscale(&cs[1], 1.0f, 1.0f / 512.0f); // n_t
-        expscales[3] = cuda_expscale(&cs[2], 1.0f, 1.0f / 16.0f); // n_r
-        expscales[4] = cuda_expscale(&cs[3], 3.0f, 1.0f / 512.0f); // n_n
-        expscales[5] = cuda_expscale(&cs[4], 3.0f, 1.0f / 512.0f); // n_p
+        expscales[N_H] = cuda_expscale(&os[0], 1.3f, 1.0f / 128.0f); // n_h
+        expscales[N_M] = cuda_expscale(&cs[0], 1.0f, 1.0f / 512.0f); // n_m
+        expscales[N_T] = cuda_expscale(&cs[1], 1.0f, 1.0f / 512.0f); // n_t
+        expscales[N_R] = cuda_expscale(&cs[2], 1.0f, 1.0f / 16.0f); // n_r
+        expscales[N_N] = cuda_expscale(&cs[3], 3.0f, 1.0f / 512.0f); // n_n
+        expscales[N_P] = cuda_expscale(&cs[4], 3.0f, 1.0f / 512.0f); // n_p
     }
+
+
 
     void initialise_tables() {
       // First allocating an array of pointers
@@ -280,13 +308,15 @@ __device__ CudaNoise *expscales;
       for (int i = 0; i < 6; i++) {
         cudaSafeCall(cudaMalloc((void**)&device_biome_table[i], 6 * sizeof(enum CudaBiome)));
       }
+      cudaSafeCall(cudaMalloc((void**)&device_biome_data, (BIOME_LAST + 1) * sizeof(CudaBiomeData)));
       cudaSafeCall(cudaMalloc((void**)&device_heat_map, 6 * sizeof(float)));
       cudaSafeCall(cudaMalloc((void**)&device_moisture_map, 6 * sizeof(float)));
 
       // Now copying data from host to device
 	  for (int i = 0; i < 6; i++) {
-        cudaSafeCall(cudaMemcpyToSymbol((*(&device_biome_table[i])), BIOME_TABLE[i], 6 * sizeof(enum CudaBiome), 0));
+        cudaSafeCall(cudaMemcpyToSymbol((*(&device_biome_table[i])), BIOME_TABLE[i], sizeof(CudaBiome), 0));
 	  }
+      cudaSafeCall(cudaMemcpy(device_biome_data, CUDA_BIOME_DATA, (BIOME_LAST + 1) * sizeof(CudaBiomeData), cudaMemcpyHostToDevice));
       cudaSafeCall(cudaMemcpyToSymbol((*(&device_heat_map)), HEAT_MAP, 5 * sizeof(float), 0));
       cudaSafeCall(cudaMemcpyToSymbol((*(&device_moisture_map)), MOISTURE_MAP, 5 * sizeof(float), 0));
     }
@@ -295,6 +325,7 @@ __device__ CudaNoise *expscales;
       for (int i = 0; i < 6; i++) {
         cudaFree(device_biome_table[i]);
       }
+      cudaFree(device_biome_data);
       cudaFree(device_biome_table);
       cudaFree(device_heat_map);
       cudaFree(device_moisture_map);
@@ -316,6 +347,36 @@ __device__ CudaNoise *expscales;
       cudaFree(expscales);
     }
 
+    __global__ void compute_heightmap_gpu(int *heightmap, CUDA_WORLDGEN_DATA *data,
+                                          const int chunk_size_x, const int chunk_size_z,
+                                          const int number_of_chunk_columns,
+                                          const int chunk_world_position_x, const int chunk_world_position_z,
+                                          unsigned long world_seed) {
+        const int my_id = blockIdx.x * blockDim.x + threadIdx.x;
+        if (my_id < number_of_chunk_columns) {
+            long wx = chunk_world_position_x + (my_id % chunk_size_x);
+            long wz = chunk_world_position_z + (my_id / chunk_size_z);
+            float h = expscales[N_H].compute(&expscales[N_H].params, (float)world_seed, wx, wz),
+                  m = expscales[N_M].compute(&expscales[N_M].params, (float)world_seed, wx, wz) * 0.5f + 0.5f,
+                  t = expscales[N_T].compute(&expscales[N_T].params, (float)world_seed, wx, wz) * 0.5f + 0.5f,
+                  r = expscales[N_R].compute(&expscales[N_R].params, (float)world_seed, wx, wz),
+                  n = expscales[N_N].compute(&expscales[N_N].params, (float)world_seed, wx, wz),
+                  p = expscales[N_P].compute(&expscales[N_P].params, (float)world_seed, wx, wz);
+
+            // add 'peak' noise to mountain noise
+            n += safe_expf(p, (1.0f - n) * 3.0f);
+
+            // decrease temperature with height
+            t -= 0.4f * n;
+            t = clamp(t, 0.0f, 1.0f);
+
+            CudaBiome biome_id = get_biome(h, m, t, n, n + h);
+            CudaBiomeData biome = device_biome_data[biome_id];
+
+            h = sign(h) * fabsf(powf(fabsf(h), biome.exp));
+        }
+    }
+
     /*
      * This function generates blocks for a single chunk.
      * */
@@ -330,22 +391,32 @@ __device__ CudaNoise *expscales;
       const int gpu_blocks = calculate_gpu_blocks(blocks_to_generate);
       init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
 
-      int *heightmap = (int *)malloc(chunk_size_x * chunk_size_z * sizeof(int)); // generating a y column height for each position (x, z)
+      int *heightmap = NULL; // generating a y column height for each position (x, z)
+      CUDA_WORLDGEN_DATA *data = NULL;
 
       if (must_generate_heightmap) {
+        heightmap = (int *)malloc(chunk_size_x * chunk_size_z * sizeof(int));
+        data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
+        int *d_heightmap;
+        CUDA_WORLDGEN_DATA *d_data;
+        cudaSafeCall(cudaMalloc((void**)&d_heightmap, chunk_size_x * chunk_size_z * sizeof(int)));
+        cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
         initialise_tables();
         initialise_noise_arrays();
 
-
+        // TODO: write a global kernel that computes the heightmaps
 
         destroy_tables();
         destroy_noise_arrays();
+        cudaFree(d_heightmap);
+        cudaFree(d_data);
       }
 
       return CUDA_RESULT {
-        .blocks_number = 0, // try to put only the useful blocks here
-        .blocks = nullptr,
-        .heightmap = heightmap
+          .blocks_number = 0, // try to put only the useful blocks here
+          .blocks = NULL,
+          .heightmap = heightmap,
+          .data = data
       };
     }
 

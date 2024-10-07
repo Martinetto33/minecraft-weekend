@@ -6,7 +6,9 @@ extern "C" {
 #endif
 #include "../../../lib/noise/noise1234.h"
 #include <string.h> // for memcpy
+#ifndef EPSILON
 #define EPSILON 0.000001f // for float comparison
+#endif
 
 // This is the new and improved, C(2) continuous interpolant
 #define CUDA_FADE(t) ( t * t * t * ( t * ( t * 6 - 15 ) + 10 ) )
