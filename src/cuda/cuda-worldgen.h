@@ -50,7 +50,6 @@ extern "C" {
     typedef struct cudaChunkResult {
         int blocks_number;
         CudaBlockId *blocks;
-        int *heightmap;
         CUDA_WORLDGEN_DATA *data;
     } CUDA_RESULT;
 

@@ -332,10 +332,10 @@ __device__ CudaNoise *expscales;
     }
 
     void initialise_noise_arrays() {
-      cudaSafeCall(cudaMalloc((void**)&bs, 4 * sizeof(struct CudaNoise)));
-      cudaSafeCall(cudaMalloc((void**)&os, 6 * sizeof(struct CudaNoise)));
-      cudaSafeCall(cudaMalloc((void**)&cs, 5 * sizeof(struct CudaNoise)));
-      cudaSafeCall(cudaMalloc((void**)&expscales, 6 * sizeof(struct CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&bs, 4 * sizeof(CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&os, 6 * sizeof(CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&cs, 5 * sizeof(CudaNoise)));
+      cudaSafeCall(cudaMalloc((void**)&expscales, 6 * sizeof(CudaNoise)));
       generate_noise<<<1,1>>>();
       cudaCheckError();
     }
@@ -347,7 +347,12 @@ __device__ CudaNoise *expscales;
       cudaFree(expscales);
     }
 
-    __global__ void compute_heightmap_gpu(int *heightmap, CUDA_WORLDGEN_DATA *data,
+    __device__ __forceinline__ CUDA_WORLDGEN_DATA get_worldgen_data_at(int x, int z, int chunk_size_x, int chunk_size_z, CUDA_WORLDGEN_DATA* data) {
+        const int array_index = clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
+        return data[array_index];
+    }
+
+    __global__ void compute_heightmap_gpu(CUDA_WORLDGEN_DATA *data,
                                           const int chunk_size_x, const int chunk_size_z,
                                           const int number_of_chunk_columns,
                                           const int chunk_world_position_x, const int chunk_world_position_z,
@@ -374,6 +379,21 @@ __device__ CudaNoise *expscales;
             CudaBiomeData biome = device_biome_data[biome_id];
 
             h = sign(h) * fabsf(powf(fabsf(h), biome.exp));
+
+            data[my_id] = (CudaWorldgenData) {
+                .h_b = ((h * 32.0f) + (n * 256.0f)) * biome.scale + (biome.roughness * r * 2.0f),
+                .b = biome_id
+            };
+            __syncthreads(); // barrier synchronisation needed to avoid race conditions
+            const int my_x = my_id % chunk_size_x;
+            const int my_z = my_id / chunk_size_z;
+            float v = 0.0f;
+            v += get_worldgen_data_at(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z, data).h_b;
+            v += get_worldgen_data_at(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z, data).h_b;
+            v += get_worldgen_data_at(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z, data).h_b;
+            v += get_worldgen_data_at(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z, data).h_b;
+            v *= 0.25f;
+            data[my_id].h = v;
         }
     }
 
@@ -391,15 +411,11 @@ __device__ CudaNoise *expscales;
       const int gpu_blocks = calculate_gpu_blocks(blocks_to_generate);
       init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
 
-      int *heightmap = NULL; // generating a y column height for each position (x, z)
       CUDA_WORLDGEN_DATA *data = NULL;
 
       if (must_generate_heightmap) {
-        heightmap = (int *)malloc(chunk_size_x * chunk_size_z * sizeof(int));
         data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
-        int *d_heightmap;
         CUDA_WORLDGEN_DATA *d_data;
-        cudaSafeCall(cudaMalloc((void**)&d_heightmap, chunk_size_x * chunk_size_z * sizeof(int)));
         cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
         initialise_tables();
         initialise_noise_arrays();
@@ -408,14 +424,12 @@ __device__ CudaNoise *expscales;
 
         destroy_tables();
         destroy_noise_arrays();
-        cudaFree(d_heightmap);
         cudaFree(d_data);
       }
 
       return CUDA_RESULT {
           .blocks_number = 0, // try to put only the useful blocks here
           .blocks = NULL,
-          .heightmap = heightmap,
           .data = data
       };
     }
