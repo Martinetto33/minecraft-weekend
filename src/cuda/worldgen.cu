@@ -18,6 +18,7 @@ extern "C" {
 #define N_R 3
 #define N_N 4
 #define N_P 5
+#define WATER_LEVEL 0
 #ifndef safe_expf
 #define safe_expf(_x, _e) ({ __typeof__(_x) __x = (_x); __typeof__(_e) __e = (_e); sign(__x) * fabsf(powf(fabsf(__x), __e)); })
 #endif
@@ -397,6 +398,66 @@ __device__ CudaNoise *expscales;
         }
     }
 
+    __global__ void generate_blocks_gpu(
+        CUDA_WORLDGEN_DATA *data,
+        CudaBlockId *blocks,
+        int chunk_size_x, int chunk_size_y, int chunk_size_z,
+        int chunk_world_position_y,
+        unsigned long total_blocks_number,
+        unsigned long *array_of_partial_results
+    ) {
+        /* Each thread of the same block modifies its own value of this shared array;
+         * eventually, the threads of this block will compute a partial reduction on this
+         * array. */
+        __shared__ int local_generated_blocks[BLKDIM];
+        const unsigned int lindex = threadIdx.x; // local index
+        local_generated_blocks[lindex] = 0;
+        const int global_index = blockIdx.x * blockDim.x + threadIdx.x;
+        if (global_index < total_blocks_number) {
+            const int my_y = global_index / (chunk_size_x * chunk_size_z);
+            const CUDA_WORLDGEN_DATA my_data = data[global_index];
+            const long h = my_data.h;
+            const CudaBiome biome = (CudaBiome)my_data.b;
+            const CudaBiomeData biome_data = device_biome_data[biome];
+            const CudaBlockId top_block = h > 48 ? SNOW : biome_data.top_block,
+                under_block = biome_data.bottom_block;
+            const long y_w = chunk_world_position_y + my_y;
+            CudaBlockId block = AIR;
+
+            if (y_w > h && y_w <= WATER_LEVEL) {
+                block = WATER;
+            } else if (y_w > h) {
+                return;
+            } else if (y_w == h) {
+                block = top_block;
+            } else if (y_w >= (h - 3)) {
+                block = under_block;
+            } else {
+                block = STONE;
+            }
+
+            blocks[global_index] = block;
+            local_generated_blocks[lindex]++;
+
+            __syncthreads();
+            /* At the end, the threads of each block compute a partial reduction.
+             * This algorithm is safe since BLKDIM is a multiple of 2.
+             * */
+            int bsize = blockDim.x / 2;
+            while (bsize > 0) {
+                if (lindex < bsize) {
+                    local_generated_blocks[lindex] += local_generated_blocks[lindex + bsize];
+                }
+                bsize = bsize / 2;
+                __syncthreads();
+            }
+            if (0 == lindex) {
+                array_of_partial_results[blockIdx.x] = local_generated_blocks[lindex];
+            }
+            // TODO: add decorations
+        }
+    }
+
     /*
      * This function generates blocks for a single chunk.
      * */
@@ -439,9 +500,18 @@ __device__ CudaNoise *expscales;
         cudaFree(d_data);
       }
 
+      CudaBlockId *d_blocks;
+      size_t total_blocks_size = sizeof(CudaBlockId) * chunk_size_x * chunk_size_y * chunk_size_z;
+      CudaBlockId *h_blocks = (CudaBlockId *) malloc(total_blocks_size);
+      cudaSafeCall(cudaMalloc((void **) &d_blocks, total_blocks_size));
+
+      //TODO: generateBlocks<<<>>>()
+      cudaSafeCall(cudaMemcpy(h_blocks, d_blocks, total_blocks_size, cudaMemcpyDeviceToHost));
+      cudaFree(d_blocks);
+
       return CUDA_RESULT {
           .blocks_number = 0, // try to put only the useful blocks here
-          .blocks = NULL,
+          .blocks = h_blocks,
           .data = data
       };
     }
