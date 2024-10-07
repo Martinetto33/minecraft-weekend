@@ -76,7 +76,7 @@ extern "C" {
     CUDA_RESULT generateBlocks(int chunk_size_x, int chunk_size_y, int chunk_size_z,
                                int chunk_world_position_x, int chunk_world_position_y, int chunk_world_position_z,
                                unsigned long world_seed, long hash,
-                               bool must_generate_heightmap);
+                               bool must_generate_worldgen_data);
 #ifdef __cplusplus
 }
 #endif

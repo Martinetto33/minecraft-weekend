@@ -352,7 +352,7 @@ __device__ CudaNoise *expscales;
         return data[array_index];
     }
 
-    __global__ void compute_heightmap_gpu(CUDA_WORLDGEN_DATA *data,
+    __global__ void compute_worldgen_data_gpu(CUDA_WORLDGEN_DATA *data,
                                           const int chunk_size_x, const int chunk_size_z,
                                           const int number_of_chunk_columns,
                                           const int chunk_world_position_x, const int chunk_world_position_z,
@@ -403,7 +403,7 @@ __device__ CudaNoise *expscales;
     CUDA_RESULT generateBlocks(int chunk_size_x, int chunk_size_y, int chunk_size_z,
                                int chunk_world_position_x, int chunk_world_position_y, int chunk_world_position_z,
                                unsigned long world_seed, long hash,
-                               bool must_generate_heightmap) {
+                               bool must_generate_worldgen_data) {
       // TODO
 	  // How many world blocks should be generated?
       const int blocks_to_generate = chunk_size_x * chunk_size_y * chunk_size_z;
@@ -413,7 +413,7 @@ __device__ CudaNoise *expscales;
 
       CUDA_WORLDGEN_DATA *data = NULL;
 
-      if (must_generate_heightmap) {
+      if (must_generate_worldgen_data) {
         data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
         CUDA_WORLDGEN_DATA *d_data;
         cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
@@ -421,6 +421,18 @@ __device__ CudaNoise *expscales;
         initialise_noise_arrays();
 
         // TODO: write a global kernel that computes the heightmaps
+        /* Bottom blocks of the chunk (usually 32 * 32) */
+        const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
+        const int gpu_blocks_for_worldgen_data = calculate_gpu_blocks(bottom_blocks_to_generate);
+        compute_worldgen_data_gpu<<<gpu_blocks_for_worldgen_data, BLKDIM>>>(
+            data,
+            chunk_size_x, chunk_size_z,
+            chunk_size_x * chunk_size_z,
+            chunk_world_position_x, chunk_world_position_z,
+            world_seed
+        );
+        cudaCheckError();
+        cudaSafeCall(cudaMemcpy(data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
 
         destroy_tables();
         destroy_noise_arrays();
