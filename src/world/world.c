@@ -214,7 +214,9 @@ void world_load_chunk(struct World *self, ivec3s offset) {
     struct Chunk *chunk = malloc(sizeof(struct Chunk));
     chunk_init(chunk, self, offset);
     chunk->flags.generating = true;
-    worldgen_generate(chunk);
+    //worldgen_generate(chunk);
+    cuda_worldgen_generate(chunk);
+    printf("Cuda call in world.c/world_load_chunk() went ok!\n");
     // set blocks which were previously unloaded
     for (size_t i = 0; i < self->unloaded_blocks.size; i++) {
         struct WorldUnloadedBlock data = self->unloaded_blocks.list[i];

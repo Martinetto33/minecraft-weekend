@@ -16,6 +16,7 @@ struct WorldgenData {
 };
 
 void worldgen_generate(struct Chunk *chunk);
+void cuda_worldgen_generate(struct Chunk *chunk);
 
 void worldgen_pine(struct Chunk *chunk, FWGGet get, FWGSet set, s64 x, s64 y, s64 z);
 void worldgen_tree(struct Chunk *chunk, FWGGet get, FWGSet set, s64 x, s64 y, s64 z);
