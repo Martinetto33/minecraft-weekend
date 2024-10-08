@@ -414,8 +414,14 @@ __device__ CudaNoise *expscales;
         local_generated_blocks[lindex] = 0;
         const int global_index = blockIdx.x * blockDim.x + threadIdx.x;
         if (global_index < total_blocks_number) {
+            const int my_x = global_index & chunk_size_x;
             const int my_y = global_index / (chunk_size_x * chunk_size_z);
-            const CUDA_WORLDGEN_DATA my_data = data[global_index];
+            const int completed_xz_planes_elements = my_y * chunk_size_x * chunk_size_z;
+            const int my_z = (global_index - completed_xz_planes_elements) / chunk_size_x;
+            const int my_xz = my_z * chunk_size_x + my_x;
+            // Data is an array of size chunk_size_x * chunk_size_z;
+            // it only contains values for columns, not for all the blocks!
+            const CUDA_WORLDGEN_DATA my_data = data[my_xz];
             const long h = my_data.h;
             const CudaBiome biome = (CudaBiome)my_data.b;
             const CudaBiomeData biome_data = device_biome_data[biome];
@@ -441,7 +447,7 @@ __device__ CudaNoise *expscales;
 
             __syncthreads();
             /* At the end, the threads of each block compute a partial reduction.
-             * This algorithm is safe since BLKDIM is a multiple of 2.
+             * This algorithm is safe since BLKDIM is a power of 2 (1024 = 2^10).
              * */
             int bsize = blockDim.x / 2;
             while (bsize > 0) {
@@ -460,19 +466,21 @@ __device__ CudaNoise *expscales;
 
     /*
      * This function generates blocks for a single chunk.
+     * parameter_data is an array of CUDA_WORLDGEN_DATA, in case they were already
+     * generated. Its size is chunk_size_x * chunk_size_z.
      * */
     CUDA_RESULT generateBlocks(int chunk_size_x, int chunk_size_y, int chunk_size_z,
                                int chunk_world_position_x, int chunk_world_position_y, int chunk_world_position_z,
                                unsigned long world_seed, long hash,
-                               bool must_generate_worldgen_data) {
-      // TODO
+                               bool must_generate_worldgen_data,
+                               CUDA_WORLDGEN_DATA *parameter_data) {
 	  // How many world blocks should be generated?
       const int blocks_to_generate = chunk_size_x * chunk_size_y * chunk_size_z;
       // How many GPU blocks should be allocated for the computation?
       const int gpu_blocks = calculate_gpu_blocks(blocks_to_generate);
       init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
 
-      CUDA_WORLDGEN_DATA *data = NULL;
+      CUDA_WORLDGEN_DATA *data = parameter_data;
 
       if (must_generate_worldgen_data) {
         data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
@@ -501,16 +509,37 @@ __device__ CudaNoise *expscales;
       }
 
       CudaBlockId *d_blocks;
+      CUDA_WORLDGEN_DATA *d_data;
+      cudaSafeCall(cudaMalloc((void**)&d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z));
+      cudaSafeCall(cudaMemcpy(d_data, data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
       size_t total_blocks_size = sizeof(CudaBlockId) * chunk_size_x * chunk_size_y * chunk_size_z;
       CudaBlockId *h_blocks = (CudaBlockId *) malloc(total_blocks_size);
       cudaSafeCall(cudaMalloc((void **) &d_blocks, total_blocks_size));
+      unsigned long *h_array_of_partial_results = (unsigned long *) malloc(gpu_blocks * sizeof(unsigned long));
+      unsigned long *d_array_of_partial_results;
+      cudaSafeCall(cudaMalloc((void **) &d_array_of_partial_results, gpu_blocks * sizeof(unsigned long)));
 
-      //TODO: generateBlocks<<<>>>()
+      generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
+        d_data,
+        d_blocks,
+        chunk_size_x, chunk_size_y, chunk_size_z,
+        chunk_world_position_y,
+        blocks_to_generate,
+        d_array_of_partial_results
+      );
+      cudaCheckError();
+      cudaSafeCall(cudaMemcpy(h_array_of_partial_results, d_array_of_partial_results, gpu_blocks * sizeof(unsigned long), cudaMemcpyDeviceToHost));
+      unsigned long generated_blocks = 0;
+      for (int i = 0; i < gpu_blocks; i++) {
+          generated_blocks += h_array_of_partial_results[i];
+      }
+      free(h_array_of_partial_results);
       cudaSafeCall(cudaMemcpy(h_blocks, d_blocks, total_blocks_size, cudaMemcpyDeviceToHost));
       cudaFree(d_blocks);
-
+      cudaFree(d_array_of_partial_results);
+      cudaFree(d_data);
       return CUDA_RESULT {
-          .blocks_number = 0, // try to put only the useful blocks here
+          .blocks_number = generated_blocks, // try to put only the useful blocks here
           .blocks = h_blocks,
           .data = data
       };
