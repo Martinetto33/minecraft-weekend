@@ -6,15 +6,18 @@ UNAME_S = $(shell uname -s)
 # You need to run `make clean' before being able to change this variable.
 CHUNKS_SIZE ?= 16
 
-CC = nvcc
-CFLAGS = -std=c++17 -O3 -g -Xcompiler "-Wall -Wextra -Wpedantic -Wstrict-aliasing"
-#CFLAGS += -Wno-pointer-arith -Wno-newline-eof -Wno-unused-parameter -Wno-gnu-statement-expression
-#CFLAGS += -Wno-gnu-compound-literal-initializer -Wno-gnu-zero-variadic-macro-arguments
+C_COMPILER = clang
+CUDA_COMPILER = nvcc
+CFLAGS = -std=c11 -O3 -g -Wall -Wextra -Wpedantic -Wstrict-aliasing
+CFLAGS += -Wno-pointer-arith -Wno-newline-eof -Wno-unused-parameter -Wno-gnu-statement-expression
+CFLAGS += -Wno-gnu-compound-literal-initializer -Wno-gnu-zero-variadic-macro-arguments
 CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise #-fbracket-depth=1024
-#CFLAGS += -Wno-error=implicit-function-declaration
+CFLAGS += -Wno-error=implicit-function-declaration
 # Adding the environmental variable ALIN_CHUNKS_SIZE as a compilation flag; it's used in the world/world.c file
 CFLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
 LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/opt/cuda/nvvm/lib64 -lcudart
+
+CUDA_FLAGS = -std=c++17 -O3 -g -Xcompiler "-Wall -Wpedantic -Wextra -Wstrict-aliasing"
 
 # GLFW required frameworks on OSX
 ifeq ($(UNAME_S), Darwin)
@@ -49,14 +52,14 @@ run: all
 	$(BIN)/game
 
 game: $(OBJ)
-	$(CC) -o $(BIN)/game $^ $(LDFLAGS)
+	$(CUDA_COMPILER) -o $(BIN)/game $^ $(LDFLAGS)
 
 # Rule for compiling CUDA files with nvcc
 %.o: %.cu
-	$(CC) -dc $< -o $@ $(CFLAGS)
+	$(CUDA_COMPILER) -dc $< -o $@ $(CUDA_FLAGS)
 
 %.o: %.c
-	$(CC) -o $@ -c $< $(CFLAGS)
+	$(C_COMPILER) -o $@ -c $< $(CFLAGS)
 
 clean:
 	rm -rf $(BIN) $(OBJ)

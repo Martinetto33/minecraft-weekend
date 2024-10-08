@@ -72,29 +72,29 @@ __device__ CudaNoise *expscales;
 
     CudaBiomeData CUDA_BIOME_DATA[BIOME_LAST + 1] = {
     [OCEAN] = {
-        .top_block = SAND,
-        .bottom_block = SAND,
+        .top_block = CUDA_SAND,
+        .bottom_block = CUDA_SAND,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f
     },
     [RIVER] = {
-        .top_block = SAND,
-        .bottom_block = SAND,
+        .top_block = CUDA_SAND,
+        .bottom_block = CUDA_SAND,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f
     },
     [BEACH] = {
-        .top_block = SAND,
-        .bottom_block = SAND,
+        .top_block = CUDA_SAND,
+        .bottom_block = CUDA_SAND,
         .roughness = 0.2f,
         .scale = 0.8f,
         .exp = 1.3f
     },
     [DESERT] = {
-        .top_block = SAND,
-        .bottom_block = SAND,
+        .top_block = CUDA_SAND,
+        .bottom_block = CUDA_SAND,
         .roughness = 0.6f,
         .scale = 0.6f,
         .exp = 1.2f,
@@ -103,8 +103,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [SAVANNA] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -115,8 +115,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [JUNGLE] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -127,8 +127,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [GRASSLAND] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -139,8 +139,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [WOODLAND] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -151,8 +151,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [FOREST] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -163,8 +163,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [RAINFOREST] = {
-        .top_block = GRASS,
-        .bottom_block = DIRT,
+        .top_block = CUDA_GRASS,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -175,8 +175,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [TAIGA] = {
-        .top_block = PODZOL,
-        .bottom_block = DIRT,
+        .top_block = CUDA_PODZOL,
+        .bottom_block = CUDA_DIRT,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -187,8 +187,8 @@ __device__ CudaNoise *expscales;
         }
     },
     [TUNDRA] = {
-        .top_block = SNOW,
-        .bottom_block = STONE,
+        .top_block = CUDA_SNOW,
+        .bottom_block = CUDA_STONE,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f,
@@ -197,15 +197,15 @@ __device__ CudaNoise *expscales;
         }
     },
     [ICE] = {
-        .top_block = SNOW,
-        .bottom_block = STONE,
+        .top_block = CUDA_SNOW,
+        .bottom_block = CUDA_STONE,
         .roughness = 1.0f,
         .scale = 1.0f,
         .exp = 1.0f
     },
     [MOUNTAIN] = {
-        .top_block = SNOW,
-        .bottom_block = STONE,
+        .top_block = CUDA_SNOW,
+        .bottom_block = CUDA_STONE,
         .roughness = 2.0f,
         .scale = 1.2f,
         .exp = 1.0f
@@ -425,13 +425,13 @@ __device__ CudaNoise *expscales;
             const long h = my_data.h;
             const CudaBiome biome = (CudaBiome)my_data.b;
             const CudaBiomeData biome_data = device_biome_data[biome];
-            const CudaBlockId top_block = h > 48 ? SNOW : biome_data.top_block,
+            const CudaBlockId top_block = h > 48 ? CUDA_SNOW : biome_data.top_block,
                 under_block = biome_data.bottom_block;
             const long y_w = chunk_world_position_y + my_y;
-            CudaBlockId block = AIR;
+            CudaBlockId block = CUDA_AIR;
 
             if (y_w > h && y_w <= WATER_LEVEL) {
-                block = WATER;
+                block = CUDA_WATER;
             } else if (y_w > h) {
                 return;
             } else if (y_w == h) {
@@ -439,7 +439,7 @@ __device__ CudaNoise *expscales;
             } else if (y_w >= (h - 3)) {
                 block = under_block;
             } else {
-                block = STONE;
+                block = CUDA_STONE;
             }
 
             blocks[global_index] = block;

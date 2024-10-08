@@ -1,4 +1,4 @@
-
+#include "../../cuda/cuda-worldgen.h"
 #include "worldgen.h"
 #include "noise.h"
 #include "../chunk.h"
@@ -397,5 +397,28 @@ void worldgen_generate(struct Chunk *chunk) {
                 }
             }
         }
+    }
+}
+
+void cuda_worldgen_generate(struct Chunk *chunk) {
+    struct Heightmap *heightmap = chunk_get_heightmap(chunk);
+    CUDA_RESULT result;
+    if (!heightmap->flags.generated) {
+        result = generateBlocks(
+            CHUNK_SIZE.x, CHUNK_SIZE.y, CHUNK_SIZE.z,
+            chunk->position.x, chunk->position.y, chunk->position.z,
+            chunk->world->seed, ivec3shash(chunk->offset),
+            true,
+            NULL
+        );
+    } else {
+        // Worldgen data exist, so they must be converted to CUDA_WORLDGEN_DATA
+        result = generateBlocks(
+            CHUNK_SIZE.x, CHUNK_SIZE.y, CHUNK_SIZE.z,
+            chunk->position.x, chunk->position.y, chunk->position.z,
+            chunk->world->seed, ivec3shash(chunk->offset),
+            false,
+            (CUDA_WORLDGEN_DATA *) heightmap->worldgen_data
+        );
     }
 }

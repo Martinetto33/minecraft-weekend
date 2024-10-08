@@ -4,35 +4,36 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdbool.h>
     /* Essentially a type alias that is identical to BlockId, defined
     * in worldgen.c by the original author. Needed for struct definitions
     * below. */
     enum CudaBlockId {
-        AIR = 0,
-        GRASS = 1,
-        DIRT = 2,
-        STONE = 3,
-        SAND = 4,
-        WATER = 5,
-        GLASS = 6,
-        LOG = 7,
-        LEAVES = 8,
-        ROSE = 9,
-        BUTTERCUP = 10,
-        COAL = 11,
-        COPPER = 12,
-        LAVA = 13,
-        CLAY = 14,
-        GRAVEL = 15,
-        PLANKS = 16,
-        TORCH = 17,
-        COBBLESTONE = 18,
-        SNOW = 19,
-        PODZOL = 20,
-        SHRUB = 21,
-        TALLGRASS = 22,
-        PINE_LOG = 23,
-        PINE_LEAVES = 24
+        CUDA_AIR = 0,
+        CUDA_GRASS = 1,
+        CUDA_DIRT = 2,
+        CUDA_STONE = 3,
+        CUDA_SAND = 4,
+        CUDA_WATER = 5,
+        CUDA_GLASS = 6,
+        CUDA_LOG = 7,
+        CUDA_LEAVES = 8,
+        CUDA_ROSE = 9,
+        CUDA_BUTTERCUP = 10,
+        CUDA_COAL = 11,
+        CUDA_COPPER = 12,
+        CUDA_LAVA = 13,
+        CUDA_CLAY = 14,
+        CUDA_GRAVEL = 15,
+        CUDA_PLANKS = 16,
+        CUDA_TORCH = 17,
+        CUDA_COBBLESTONE = 18,
+        CUDA_SNOW = 19,
+        CUDA_PODZOL = 20,
+        CUDA_SHRUB = 21,
+        CUDA_TALLGRASS = 22,
+        CUDA_PINE_LOG = 23,
+        CUDA_PINE_LEAVES = 24
     };
 
     typedef struct CudaWorldgenData {
@@ -49,7 +50,7 @@ extern "C" {
      * */
     typedef struct cudaChunkResult {
         unsigned long blocks_number;
-        CudaBlockId *blocks;
+        enum CudaBlockId *blocks;
         CUDA_WORLDGEN_DATA *data;
     } CUDA_RESULT;
 
