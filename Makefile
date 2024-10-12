@@ -17,7 +17,7 @@ CFLAGS += -Wno-error=implicit-function-declaration
 CFLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
 LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/opt/cuda/nvvm/lib64 -lcudart
 
-CUDA_FLAGS = -std=c++17 -O3 -g -Xcompiler "-Wall -Wpedantic -Wextra -Wstrict-aliasing"
+CUDA_FLAGS = -std=c++17 -g -G -Xcompiler "-Wall -Wpedantic -Wextra -Wstrict-aliasing"
 CUDA_FLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise #-fbracket-depth=1024
 CUDA_FLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
 # GLFW required frameworks on OSX

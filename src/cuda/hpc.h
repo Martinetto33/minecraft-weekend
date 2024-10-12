@@ -73,12 +73,7 @@ double hpc_gettime( void )
  * This avoids the overhead of calling a different function and might be suitable for
  * small, frequently called functions, like this one is.
  */
-inline double hpc_gettime( void )
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts );
-    return ts.tv_sec + (double)ts.tv_nsec / 1e9;
-}
+double hpc_gettime();
 #endif
 
 #ifdef __CUDACC__

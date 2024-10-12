@@ -4,7 +4,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
-#define BLKDIM 1024
+#define BLKDIM 512
 
 /* These files are only going to contain stuff that is strictly related
 * to working with CUDA, and that does not regard the domain specifically. */

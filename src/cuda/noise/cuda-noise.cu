@@ -1,4 +1,4 @@
-#include "cuda-noise.h"
+#include "cuda-noise.cuh"
 /* This file is basically a merge of jdah's noise library and libnoise found under lib/noise/ */
 
 #ifdef __cplusplus
@@ -6,8 +6,8 @@ extern "C" {
 #endif
 #include "../../../lib/noise/noise1234.h"
 #include <string.h> // for memcpy
-#ifndef EPSILON
-#define EPSILON 0.000001f // for float comparison
+#ifndef EPSILON_ALIN
+#define EPSILON_ALIN 0.000001f // for float comparison
 #endif
 
 // This is the new and improved, C(2) continuous interpolant
@@ -15,6 +15,11 @@ extern "C" {
 
 #define CUDA_FASTFLOOR(x) ( ((int)(x)<(x)) ? ((int)x) : ((int)x-1 ) )
 #define CUDA_LERP(t, a, b) ((a) + (t)*((b)-(a)))
+
+#define BASIC 0
+#define OCTAVE 1
+#define COMBINED 2
+#define EXPSCALE 3
 
     __device__ unsigned char cuda_perm[] = {151,160,137,91,90,15,
   131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
@@ -107,57 +112,51 @@ extern "C" {
     //---------------------------------------------------------------------
 
     __device__ static int sign(const float n) {
-        return (n > EPSILON) - (n < -EPSILON);
+        return (n > EPSILON_ALIN) - (n < -EPSILON_ALIN);
     }
 
-    __device__ float cuda_octave_compute(const CudaOctave *p, const float seed, const float x, const float z) {
+    __device__ CudaNoise::CudaNoise() = default;
+
+    __device__ float CudaOctave::compute(const float seed, const float x, const float z) const {
         float u = 1.0f, v = 0.0f;
-        for (int i = 0; i < p->n; i++) {
-            v += (1.0f / u) * cuda_noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (p->o * 32));
+        for (int i = 0; i < this->n; i++) {
+            v += (1.0f / u) * cuda_noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (this->o * 32));
             u *= 2.0f;
         }
         return v;
     }
 
-    __device__ CudaNoise cuda_octave(int n, int o) {
-        CudaNoise result = {.compute = (CudaFNoise) cuda_octave_compute};
-        const CudaOctave params = {n, o};
-        memcpy(&result.params, &params, sizeof(CudaOctave));
-        return result;
+    __device__ CudaOctave::CudaOctave(const int n, const int o) {
+        this->n = n;
+        this->o = o;
     }
 
-    __device__ float cuda_combined_compute(const CudaCombined *p, const float seed, const float x, const float z) {
-        return p->n->compute(&p->n->params, seed, x + p->m->compute(&p->m->params, seed, x, z), z);
+    __device__ float CudaCombined::compute(const float seed, const float x, const float z) const {
+        return this->n->compute(seed, x + this->m->compute(seed, x, z), z);
     }
 
-    __device__ CudaNoise cuda_combined(CudaNoise *n, CudaNoise *m) {
-        CudaNoise result = {.compute = (CudaFNoise) cuda_combined_compute};
-        const CudaCombined params = {n, m};
-        memcpy(&result.params, &params, sizeof(CudaCombined));
-        return result;
+    __device__ CudaCombined::CudaCombined(CudaNoise *n, CudaNoise *m) {
+        this->n = n;
+        this->m = m;
     }
 
-    __device__ float cuda_noise_compute(const Basic *b, const float seed, const float x, const float z) {
-        return cuda_noise3(x, z, seed + (b->o * 32.0f));
+    __device__ float CudaBasic::compute(const float seed, const float x, const float z) const {
+        return cuda_noise3(x, z, seed + (this->o * 32.0f));
     }
 
-    __device__ CudaNoise cuda_basic(const int o) {
-        CudaNoise result = {.compute = (CudaFNoise) cuda_noise_compute };
-        const Basic params = { .o = o };
-        memcpy(&result.params, &params, sizeof(Basic));
-        return result;
+    __device__ CudaBasic::CudaBasic(const int o) {
+        this->o = o;
     }
 
-    __device__ float cuda_expscale_compute(const CudaExpScale *e, const float seed, const float x, const float z) {
-        const float n = e->n->compute(&e->n->params, seed, x * e->scale, z * e->scale);
-        return sign(n) * powf(fabsf(n), e->exp);
+    __device__ float CudaExpScale::compute(const float seed, const float x, const float z) const {
+        const float n = this->n->compute(seed, x * this->scale, z * this->scale);
+        return sign(n) * powf(fabsf(n), this->exp);
     }
 
-    __device__ CudaNoise cuda_expscale(CudaNoise *n, float exp, float scale) {
-        CudaNoise result = {.compute = (CudaFNoise) cuda_expscale_compute };
-        const CudaExpScale params = { .n = n, .exp = exp, .scale = scale };
-        memcpy(&result.params, &params, sizeof(CudaExpScale));
-        return result;
+    __device__ CudaExpScale::CudaExpScale(CudaNoise *n, const float exp, const float scale) {
+        this->n = n;
+        this->exp = exp;
+        this->scale = scale;
     }
 
 #ifdef __cplusplus
