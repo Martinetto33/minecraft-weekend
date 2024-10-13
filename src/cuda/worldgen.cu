@@ -268,31 +268,31 @@ max(_mn, min(_mx, _x)); })
         return device_biome_table[device_biome_table_index];
     }
 
-    __global__ void generate_noise(CudaBasic *bs, CudaOctave *os, CudaCombined *cs, CudaExpScale *expscales) {
-        bs[0] = CudaBasic(1);
-        bs[1] = CudaBasic(2);
-        bs[2] = CudaBasic(3);
-        bs[3] = CudaBasic(4);
+    __global__ void generate_noise(CudaBasic **bs, CudaOctave **os, CudaCombined **cs, CudaExpScale **expscales) {
+        bs[0] = new CudaBasic(1);
+        bs[1] = new CudaBasic(2);
+        bs[2] = new CudaBasic(3);
+        bs[3] = new CudaBasic(4);
 
-        os[0] = CudaOctave(5, 0);
-        os[1] = CudaOctave(5, 1);
-        os[2] = CudaOctave(5, 2);
-        os[3] = CudaOctave(5, 3);
-        os[4] = CudaOctave(5, 4);
-        os[5] = CudaOctave(5, 5);
+        os[0] = new CudaOctave(5, 0);
+        os[1] = new CudaOctave(5, 1);
+        os[2] = new CudaOctave(5, 2);
+        os[3] = new CudaOctave(5, 3);
+        os[4] = new CudaOctave(5, 4);
+        os[5] = new CudaOctave(5, 5);
 
-        cs[0] = CudaCombined(&bs[0], &bs[1]);
-        cs[1] = CudaCombined(&bs[2], &bs[3]);
-        cs[2] = CudaCombined(&os[3], &os[4]);
-        cs[3] = CudaCombined(&os[1], &os[2]);
-        cs[4] = CudaCombined(&os[1], &os[3]);
+        cs[0] = new CudaCombined(bs[0], bs[1]);
+        cs[1] = new CudaCombined(bs[2], bs[3]);
+        cs[2] = new CudaCombined(os[3], os[4]);
+        cs[3] = new CudaCombined(os[1], os[2]);
+        cs[4] = new CudaCombined(os[1], os[3]);
 
-        expscales[N_H] = CudaExpScale(&os[0], 1.3f, 1.0f / 128.0f); // n_h
-        expscales[N_M] = CudaExpScale(&cs[0], 1.0f, 1.0f / 512.0f); // n_m
-        expscales[N_T] = CudaExpScale(&cs[1], 1.0f, 1.0f / 512.0f); // n_t
-        expscales[N_R] = CudaExpScale(&cs[2], 1.0f, 1.0f / 16.0f); // n_r
-        expscales[N_N] = CudaExpScale(&cs[3], 3.0f, 1.0f / 512.0f); // n_n
-        expscales[N_P] = CudaExpScale(&cs[4], 3.0f, 1.0f / 512.0f); // n_p
+        expscales[N_H] = new CudaExpScale(os[0], 1.3f, 1.0f / 128.0f); // n_h
+        expscales[N_M] = new CudaExpScale(cs[0], 1.0f, 1.0f / 512.0f); // n_m
+        expscales[N_T] = new CudaExpScale(cs[1], 1.0f, 1.0f / 512.0f); // n_t
+        expscales[N_R] = new CudaExpScale(cs[2], 1.0f, 1.0f / 16.0f); // n_r
+        expscales[N_N] = new CudaExpScale(cs[3], 3.0f, 1.0f / 512.0f); // n_n
+        expscales[N_P] = new CudaExpScale(cs[4], 3.0f, 1.0f / 512.0f); // n_p
     }
 
 
@@ -320,22 +320,11 @@ max(_mn, min(_mx, _x)); })
     void destroy_tables() {
       cudaFree(device_biome_table);
       cudaFree(device_biome_data);
-      cudaFree(device_biome_table);
       cudaFree(device_heat_map);
       cudaFree(device_moisture_map);
     }
 
-    void initialise_noise_arrays(CudaBasic **bs, CudaOctave **os, CudaCombined **cs, CudaExpScale **expscales) {
-      cudaSafeCall(cudaMalloc((void**) bs, 4 * sizeof(CudaBasic)));
-      cudaSafeCall(cudaMalloc((void**) os, 6 * sizeof(CudaOctave)));
-      cudaSafeCall(cudaMalloc((void**) cs, 5 * sizeof(CudaCombined)));
-      cudaSafeCall(cudaMalloc((void**)  expscales, 6 * sizeof(CudaExpScale)));
-
-      generate_noise<<<1,1>>>(*bs, *os, *cs, *expscales);
-      cudaCheckError();
-    }
-
-    void destroy_noise_arrays(CudaBasic *bs, CudaOctave *os, CudaCombined *cs, CudaExpScale *expscales) {
+    void destroy_noise_arrays(CudaBasic *bs, CudaOctave *os, CudaCombined *cs, CudaExpScale **expscales) {
       cudaFree(bs);
       cudaFree(os);
       cudaFree(cs);
@@ -352,16 +341,16 @@ max(_mn, min(_mx, _x)); })
                                           const int number_of_chunk_columns,
                                           const int chunk_world_position_x, const int chunk_world_position_z,
                                           unsigned long world_seed,
-                                          CudaExpScale *expscales) {
+                                          CudaExpScale **expscales) {
         if (const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x; my_id < number_of_chunk_columns) {
             long wx = chunk_world_position_x + (my_id % chunk_size_x);
             long wz = chunk_world_position_z + (my_id / chunk_size_z);
-            float h = expscales[N_H].compute((float)world_seed, wx, wz),
-                  m = expscales[N_M].compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
-                  t = expscales[N_T].compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
-                  r = expscales[N_R].compute((float)world_seed, wx, wz),
-                  n = expscales[N_N].compute((float)world_seed, wx, wz),
-                  p = expscales[N_P].compute((float)world_seed, wx, wz);
+            float h = expscales[N_H]->compute((float)world_seed, wx, wz),
+                  m = expscales[N_M]->compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
+                  t = expscales[N_T]->compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
+                  r = expscales[N_R]->compute((float)world_seed, wx, wz),
+                  n = expscales[N_N]->compute((float)world_seed, wx, wz),
+                  p = expscales[N_P]->compute((float)world_seed, wx, wz);
 
             // add 'peak' noise to mountain noise
             n += safe_expf(p, (1.0f - n) * 3.0f);
@@ -477,15 +466,22 @@ max(_mn, min(_mx, _x)); })
       CUDA_WORLDGEN_DATA *data = parameter_data;
 
       if (must_generate_worldgen_data) {
-        CudaBasic *bs = nullptr;
-        CudaOctave *os = nullptr;
-        CudaCombined *cs = nullptr;
-        CudaExpScale *expscales = nullptr;
+        CudaBasic **bs = nullptr;
+        CudaOctave **os = nullptr;
+        CudaCombined **cs = nullptr;
+        CudaExpScale **expscales = nullptr;
         data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
         CUDA_WORLDGEN_DATA *d_data;
         cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
         initialise_tables();
-        initialise_noise_arrays(&bs, &os, &cs, &expscales);
+
+        // Initialisation of noise arrays of pointers
+        cudaSafeCall(cudaMalloc((void **) &bs, 4 * sizeof(CudaBasic&)));
+        cudaSafeCall(cudaMalloc((void **) &os, 6 * sizeof(CudaOctave&)));
+        cudaSafeCall(cudaMalloc((void **) &cs, 5 * sizeof(CudaCombined&)));
+        cudaSafeCall(cudaMalloc((void **) &expscales, 6 * sizeof(CudaExpScale&)));
+        generate_noise<<<1, 1>>>(bs, os, cs, expscales);
+        cudaCheckError();
 
         /* Bottom blocks of the chunk (usually 32 * 32) */
         const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
@@ -502,7 +498,11 @@ max(_mn, min(_mx, _x)); })
         cudaSafeCall(cudaMemcpy(data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
 
         destroy_tables();
-        destroy_noise_arrays(bs, os, cs, expscales);
+        // TODO: maybe remove these free()s because the noise arrays can be reused in future calls
+        cudaFree(bs);
+        cudaFree(os);
+        cudaFree(cs);
+        cudaFree(expscales);
         cudaFree(d_data);
       }
 
@@ -517,14 +517,14 @@ max(_mn, min(_mx, _x)); })
       unsigned long *d_array_of_partial_results;
       cudaSafeCall(cudaMalloc((void **) &d_array_of_partial_results, gpu_blocks * sizeof(unsigned long)));
 
-      generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
+      /*generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
         d_data,
         d_blocks,
         chunk_size_x, chunk_size_y, chunk_size_z,
         chunk_world_position_y,
         blocks_to_generate,
         d_array_of_partial_results
-      );
+      );*/
       cudaCheckError();
       cudaSafeCall(cudaMemcpy(h_array_of_partial_results, d_array_of_partial_results, gpu_blocks * sizeof(unsigned long), cudaMemcpyDeviceToHost));
       unsigned long generated_blocks = 0;

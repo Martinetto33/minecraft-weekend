@@ -117,7 +117,7 @@ extern "C" {
 
     __device__ CudaNoise::CudaNoise() = default;
 
-    __device__ float CudaOctave::compute(const float seed, const float x, const float z) const {
+    __device__ float CudaOctave::compute(const float seed, const float x, const float z) {
         float u = 1.0f, v = 0.0f;
         for (int i = 0; i < this->n; i++) {
             v += (1.0f / u) * cuda_noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (this->o * 32));
@@ -131,7 +131,7 @@ extern "C" {
         this->o = o;
     }
 
-    __device__ float CudaCombined::compute(const float seed, const float x, const float z) const {
+    __device__ float CudaCombined::compute(const float seed, const float x, const float z) {
         return this->n->compute(seed, x + this->m->compute(seed, x, z), z);
     }
 
@@ -140,7 +140,7 @@ extern "C" {
         this->m = m;
     }
 
-    __device__ float CudaBasic::compute(const float seed, const float x, const float z) const {
+    __device__ float CudaBasic::compute(const float seed, const float x, const float z) {
         return cuda_noise3(x, z, seed + (this->o * 32.0f));
     }
 
@@ -148,7 +148,7 @@ extern "C" {
         this->o = o;
     }
 
-    __device__ float CudaExpScale::compute(const float seed, const float x, const float z) const {
+    __device__ float CudaExpScale::compute(const float seed, const float x, const float z) {
         const float n = this->n->compute(seed, x * this->scale, z * this->scale);
         return sign(n) * powf(fabsf(n), this->exp);
     }
