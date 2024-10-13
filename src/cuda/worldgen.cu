@@ -232,12 +232,12 @@ max(_mn, min(_mx, _x)); })
     };
 
     /* Tables: */
-	__device__ __constant__ CudaBiome *device_biome_table;
-    __device__ __constant__ CudaBiomeData *device_biome_data;
-    __device__ __constant__ float *device_heat_map;
-    __device__ __constant__ float *device_moisture_map;
+	__device__ __constant__ CudaBiome device_biome_table[6 * 6];
+    __device__ __constant__ CudaBiomeData device_biome_data[BIOME_LAST + 1];
+    __device__ __constant__ float device_heat_map[5];
+    __device__ __constant__ float device_moisture_map[5];
 
-    __device__ CudaBiome get_biome(float h, float m, float t, float n, float i) {
+    __device__ CudaBiome get_biome(const float h, const float m, const float t, const float n, const float i) {
         if (h <= 0.0f || n <= 0.0f) {
             return OCEAN;
         }
@@ -298,30 +298,10 @@ max(_mn, min(_mx, _x)); })
 
 
     void initialise_tables() {
-      cudaSafeCall(cudaMalloc((void**)&device_biome_table, 6 * 6 * sizeof(enum CudaBiome)));
-      cudaSafeCall(cudaMalloc((void**)&device_biome_data, (BIOME_LAST + 1) * sizeof(CudaBiomeData)));
-      cudaSafeCall(cudaMalloc((void**)&device_heat_map, 6 * sizeof(float)));
-      cudaSafeCall(cudaMalloc((void**)&device_moisture_map, 6 * sizeof(float)));
-
-      // Now copying data from host to device
-      CudaBiome *h_table = (CudaBiome*)malloc(6 * 6 * sizeof(CudaBiome));
-	  for (int i = 0; i < 6; i++) {
-	      for (int j = 0; j < 6; j++) {
-	          h_table[j + i * 6] = BIOME_TABLE[i][j];
-	      }
-	  }
-      cudaSafeCall(cudaMemcpy(device_biome_table, h_table, 6 * 6 * sizeof(CudaBiome), cudaMemcpyHostToDevice));
-	  free(h_table);
-      cudaSafeCall(cudaMemcpy(device_biome_data, CUDA_BIOME_DATA, (BIOME_LAST + 1) * sizeof(CudaBiomeData), cudaMemcpyHostToDevice));
-      cudaSafeCall(cudaMemcpy(device_heat_map, HEAT_MAP, 5 * sizeof(float), cudaMemcpyHostToDevice));
-      cudaSafeCall(cudaMemcpy(device_moisture_map, MOISTURE_MAP, 5 * sizeof(float), cudaMemcpyHostToDevice));
-    }
-
-    void destroy_tables() {
-      cudaFree(device_biome_table);
-      cudaFree(device_biome_data);
-      cudaFree(device_heat_map);
-      cudaFree(device_moisture_map);
+        cudaSafeCall(cudaMemcpyToSymbol(device_biome_table, BIOME_TABLE, 6 * 6 * sizeof(CudaBiome), 0));
+        cudaSafeCall(cudaMemcpyToSymbol(device_biome_data, CUDA_BIOME_DATA, (BIOME_LAST + 1) * sizeof(CudaBiomeData), 0));
+        cudaSafeCall(cudaMemcpyToSymbol(device_heat_map, HEAT_MAP, 5 * sizeof(float), 0));
+        cudaSafeCall(cudaMemcpyToSymbol(device_moisture_map, MOISTURE_MAP, 5 * sizeof(float), 0));
     }
 
     void destroy_noise_arrays(CudaBasic *bs, CudaOctave *os, CudaCombined *cs, CudaExpScale **expscales) {
@@ -487,7 +467,7 @@ max(_mn, min(_mx, _x)); })
         const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
         const int gpu_blocks_for_worldgen_data = calculate_gpu_blocks(bottom_blocks_to_generate);
         compute_worldgen_data_gpu<<<gpu_blocks_for_worldgen_data, BLKDIM>>>(
-            data,
+            d_data,
             chunk_size_x, chunk_size_z,
             chunk_size_x * chunk_size_z,
             chunk_world_position_x, chunk_world_position_z,
@@ -497,7 +477,6 @@ max(_mn, min(_mx, _x)); })
         cudaCheckError();
         cudaSafeCall(cudaMemcpy(data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
 
-        destroy_tables();
         // TODO: maybe remove these free()s because the noise arrays can be reused in future calls
         cudaFree(bs);
         cudaFree(os);
