@@ -30,6 +30,12 @@ __typeof__ (mx) _mx = (mx); \
 max(_mn, min(_mx, _x)); })
 #endif
 
+    bool was_environment_initialised = false;
+    CudaBasic **bs = nullptr;
+    CudaOctave **os = nullptr;
+    CudaCombined **cs = nullptr;
+    CudaExpScale **expscales = nullptr;
+
     __device__ static int sign(const float n) {
         return (n > EPSILON) - (n < -EPSILON);
     }
@@ -441,27 +447,26 @@ max(_mn, min(_mx, _x)); })
       const int blocks_to_generate = chunk_size_x * chunk_size_y * chunk_size_z;
       // How many GPU blocks should be allocated for the computation?
       const int gpu_blocks = calculate_gpu_blocks(blocks_to_generate);
-      init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
+      if (!was_environment_initialised) {
+          init_random(world_seed, hash, gpu_blocks, BLKDIM); // defined in cuda-utils
+          // Copying biomes related stuff to device constant memory
+          initialise_tables();
+          // Initialisation of noise arrays of pointers
+          cudaSafeCall(cudaMalloc((void **) &bs, 4 * sizeof(CudaBasic&)));
+          cudaSafeCall(cudaMalloc((void **) &os, 6 * sizeof(CudaOctave&)));
+          cudaSafeCall(cudaMalloc((void **) &cs, 5 * sizeof(CudaCombined&)));
+          cudaSafeCall(cudaMalloc((void **) &expscales, 6 * sizeof(CudaExpScale&)));
+          generate_noise<<<1, 1>>>(bs, os, cs, expscales);
+          cudaCheckError();
+          was_environment_initialised = true;
+      }
 
       CUDA_WORLDGEN_DATA *data = parameter_data;
 
       if (must_generate_worldgen_data) {
-        CudaBasic **bs = nullptr;
-        CudaOctave **os = nullptr;
-        CudaCombined **cs = nullptr;
-        CudaExpScale **expscales = nullptr;
         data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
         CUDA_WORLDGEN_DATA *d_data;
         cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
-        initialise_tables();
-
-        // Initialisation of noise arrays of pointers
-        cudaSafeCall(cudaMalloc((void **) &bs, 4 * sizeof(CudaBasic&)));
-        cudaSafeCall(cudaMalloc((void **) &os, 6 * sizeof(CudaOctave&)));
-        cudaSafeCall(cudaMalloc((void **) &cs, 5 * sizeof(CudaCombined&)));
-        cudaSafeCall(cudaMalloc((void **) &expscales, 6 * sizeof(CudaExpScale&)));
-        generate_noise<<<1, 1>>>(bs, os, cs, expscales);
-        cudaCheckError();
 
         /* Bottom blocks of the chunk (usually 32 * 32) */
         const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
@@ -476,12 +481,6 @@ max(_mn, min(_mx, _x)); })
         );
         cudaCheckError();
         cudaSafeCall(cudaMemcpy(data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
-
-        // TODO: maybe remove these free()s because the noise arrays can be reused in future calls
-        cudaFree(bs);
-        cudaFree(os);
-        cudaFree(cs);
-        cudaFree(expscales);
         cudaFree(d_data);
       }
 
