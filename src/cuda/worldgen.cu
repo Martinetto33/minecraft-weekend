@@ -381,16 +381,20 @@ max(_mn, min(_mx, _x)); })
         __shared__ int local_generated_blocks[BLKDIM];
         const unsigned int lindex = threadIdx.x; // local index
         local_generated_blocks[lindex] = 0;
-        const int global_index = blockIdx.x * blockDim.x + threadIdx.x;
+        const unsigned int global_index = blockIdx.x * blockDim.x + threadIdx.x;
         if (global_index < total_blocks_number) {
-            const int my_x = global_index & chunk_size_x;
-            const int my_y = global_index / (chunk_size_x * chunk_size_z);
-            const int completed_xz_planes_elements = my_y * chunk_size_x * chunk_size_z;
-            const int my_z = (global_index - completed_xz_planes_elements) / chunk_size_x;
-            const int my_xz = my_z * chunk_size_x + my_x;
+            const unsigned int my_x = global_index % chunk_size_x;
+            const unsigned int my_y = global_index / (chunk_size_x * chunk_size_z);
+            const unsigned int completed_xz_planes_elements = my_y * chunk_size_x * chunk_size_z;
+            const unsigned int my_z = (global_index - completed_xz_planes_elements) / chunk_size_x;
+            const unsigned int my_xz = my_z * chunk_size_x + my_x;
             // Data is an array of size chunk_size_x * chunk_size_z;
             // it only contains values for columns, not for all the blocks!
-            const CUDA_WORLDGEN_DATA my_data = data[my_xz];
+            const CUDA_WORLDGEN_DATA my_data = {
+                .h_b = data[my_xz].h_b,
+                .h = data[my_xz].h,
+                .b = data[my_xz].b
+            };
             const long h = my_data.h;
             const CudaBiome biome = (CudaBiome)my_data.b;
             const CudaBiomeData biome_data = device_biome_data[biome];
@@ -495,14 +499,14 @@ max(_mn, min(_mx, _x)); })
       unsigned long *d_array_of_partial_results;
       cudaSafeCall(cudaMalloc((void **) &d_array_of_partial_results, gpu_blocks * sizeof(unsigned long)));
 
-      /*generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
+      generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
         d_data,
         d_blocks,
         chunk_size_x, chunk_size_y, chunk_size_z,
         chunk_world_position_y,
         blocks_to_generate,
         d_array_of_partial_results
-      );*/
+      );
       cudaCheckError();
       cudaSafeCall(cudaMemcpy(h_array_of_partial_results, d_array_of_partial_results, gpu_blocks * sizeof(unsigned long), cudaMemcpyDeviceToHost));
       unsigned long generated_blocks = 0;
