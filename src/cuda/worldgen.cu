@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "hpc.h"
 #include "cuda-worldgen.h"
 #include "cuda-utils.h"
@@ -318,7 +320,7 @@ max(_mn, min(_mx, _x)); })
     }
 
     __device__ __forceinline__ CUDA_WORLDGEN_DATA get_worldgen_data_at(int x, int z, int chunk_size_x, int chunk_size_z, CUDA_WORLDGEN_DATA* data) {
-        const int array_index = clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
+        const int array_index = clamp(x, 0, chunk_size_x - 1) + clamp(z, 0, chunk_size_z - 1) * chunk_size_x;
         return data[array_index];
     }
 
@@ -331,12 +333,19 @@ max(_mn, min(_mx, _x)); })
         if (const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x; my_id < number_of_chunk_columns) {
             long wx = chunk_world_position_x + (my_id % chunk_size_x);
             long wz = chunk_world_position_z + (my_id / chunk_size_z);
-            float h = expscales[N_H]->compute((float)world_seed, wx, wz),
-                  m = expscales[N_M]->compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
-                  t = expscales[N_T]->compute((float)world_seed, wx, wz) * 0.5f + 0.5f,
-                  r = expscales[N_R]->compute((float)world_seed, wx, wz),
-                  n = expscales[N_N]->compute((float)world_seed, wx, wz),
-                  p = expscales[N_P]->compute((float)world_seed, wx, wz);
+            const float wx_f = __ll2float_rz(wx); // rounding long long int to 0 in CUDA way
+            const float wz_f = __ll2float_rz(wz);
+            const float world_seed_f = __ll2float_rz(world_seed);
+
+            // TODO: REMOVE THIS DEBUG PRINT
+            printf("Compute Worldgen Data GPU: [Thread %d] wx = %f, wz = %f\n", my_id, wx_f, wz_f);
+
+            float h = expscales[N_H]->compute(world_seed_f, wx_f, wz_f),
+                  m = expscales[N_M]->compute(world_seed_f, wx_f, wz_f) * 0.5f + 0.5f,
+                  t = expscales[N_T]->compute(world_seed_f, wx_f, wz_f) * 0.5f + 0.5f,
+                  r = expscales[N_R]->compute(world_seed_f, wx_f, wz_f),
+                  n = expscales[N_N]->compute(world_seed_f, wx_f, wz_f),
+                  p = expscales[N_P]->compute(world_seed_f, wx_f, wz_f);
 
             // add 'peak' noise to mountain noise
             n += safe_expf(p, (1.0f - n) * 3.0f);
@@ -397,6 +406,10 @@ max(_mn, min(_mx, _x)); })
             };
             const long h = my_data.h;
             const CudaBiome biome = (CudaBiome)my_data.b;
+            if (!(biome >= 0 && biome < BIOME_LAST + 1)) {
+                printf("[Thread %d]: biome = %d\n", global_index, biome);
+                assert(false);
+            }
             const CudaBiomeData biome_data = device_biome_data[biome];
             const CudaBlockId top_block = h > 48 ? CUDA_SNOW : biome_data.top_block,
                 under_block = biome_data.bottom_block;
@@ -465,12 +478,12 @@ max(_mn, min(_mx, _x)); })
           was_environment_initialised = true;
       }
 
-      CUDA_WORLDGEN_DATA *data = parameter_data;
+      CUDA_WORLDGEN_DATA *h_data = parameter_data;
+      CUDA_WORLDGEN_DATA *d_data;
+      cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
 
       if (must_generate_worldgen_data) {
-        data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
-        CUDA_WORLDGEN_DATA *d_data;
-        cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
+        h_data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
 
         /* Bottom blocks of the chunk (usually 32 * 32) */
         const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
@@ -484,44 +497,44 @@ max(_mn, min(_mx, _x)); })
             expscales
         );
         cudaCheckError();
-        cudaSafeCall(cudaMemcpy(data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
-        cudaFree(d_data);
+      } else {
+          // If the data had to be generated, then they're already in the device memory; otherwise, they need to be copied
+          cudaSafeCall(cudaMemcpy(d_data, h_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
       }
 
       CudaBlockId *d_blocks;
-      CUDA_WORLDGEN_DATA *d_data;
-      cudaSafeCall(cudaMalloc((void**)&d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z));
-      cudaSafeCall(cudaMemcpy(d_data, data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
       size_t total_blocks_size = sizeof(CudaBlockId) * chunk_size_x * chunk_size_y * chunk_size_z;
       CudaBlockId *h_blocks = (CudaBlockId *) malloc(total_blocks_size);
       cudaSafeCall(cudaMalloc((void **) &d_blocks, total_blocks_size));
+
+      // Arrays to calculate the total number of generated blocks
       unsigned long *h_array_of_partial_results = (unsigned long *) malloc(gpu_blocks * sizeof(unsigned long));
       unsigned long *d_array_of_partial_results;
       cudaSafeCall(cudaMalloc((void **) &d_array_of_partial_results, gpu_blocks * sizeof(unsigned long)));
 
-      generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
+      /*generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
         d_data,
         d_blocks,
         chunk_size_x, chunk_size_y, chunk_size_z,
         chunk_world_position_y,
         blocks_to_generate,
         d_array_of_partial_results
-      );
+      );*/
       cudaCheckError();
+      cudaSafeCall(cudaMemcpy(h_blocks, d_blocks, total_blocks_size, cudaMemcpyDeviceToHost));
       cudaSafeCall(cudaMemcpy(h_array_of_partial_results, d_array_of_partial_results, gpu_blocks * sizeof(unsigned long), cudaMemcpyDeviceToHost));
       unsigned long generated_blocks = 0;
       for (int i = 0; i < gpu_blocks; i++) {
           generated_blocks += h_array_of_partial_results[i];
       }
       free(h_array_of_partial_results);
-      cudaSafeCall(cudaMemcpy(h_blocks, d_blocks, total_blocks_size, cudaMemcpyDeviceToHost));
       cudaFree(d_blocks);
       cudaFree(d_array_of_partial_results);
       cudaFree(d_data);
       return CUDA_RESULT {
           .blocks_number = generated_blocks, // try to put only the useful blocks here
           .blocks = h_blocks,
-          .data = data
+          .data = h_data
       };
     }
 

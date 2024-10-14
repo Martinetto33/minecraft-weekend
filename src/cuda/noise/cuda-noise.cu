@@ -1,7 +1,6 @@
     #include "cuda-noise.cuh"
 
-#include <cassert>
-#include <cstdio>
+    #include <cstdio>
     /* This file is basically a merge of jdah's noise library and libnoise found under lib/noise/ */
 
     #ifdef __cplusplus
