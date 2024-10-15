@@ -319,9 +319,8 @@ max(_mn, min(_mx, _x)); })
       cudaFree(expscales);
     }
 
-    __device__ __forceinline__ CUDA_WORLDGEN_DATA get_worldgen_data_at(int x, int z, int chunk_size_x, int chunk_size_z, CUDA_WORLDGEN_DATA* data) {
-        const int array_index = clamp(x, 0, chunk_size_x - 1) + clamp(z, 0, chunk_size_z - 1) * chunk_size_x;
-        return data[array_index];
+    __device__ __forceinline__ int get_worldgen_data_at(int x, int z, int chunk_size_x, int chunk_size_z) {
+        return clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
     }
 
     __global__ void compute_worldgen_data_gpu(CUDA_WORLDGEN_DATA *data,
@@ -331,11 +330,11 @@ max(_mn, min(_mx, _x)); })
                                           unsigned long world_seed,
                                           CudaExpScale **expscales) {
         if (const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x; my_id < number_of_chunk_columns) {
-            long wx = chunk_world_position_x + (my_id % chunk_size_x);
-            long wz = chunk_world_position_z + (my_id / chunk_size_z);
+            const long long wx = chunk_world_position_x + (static_cast<long long>(my_id) % chunk_size_x);
+            const long long wz = chunk_world_position_z + (static_cast<long long>(my_id) / chunk_size_z);
             const float wx_f = __ll2float_rz(wx); // rounding long long int to 0 in CUDA way
             const float wz_f = __ll2float_rz(wz);
-            const float world_seed_f = __ll2float_rz(world_seed);
+            const float world_seed_f = __ull2float_rz(world_seed);
 
             // TODO: REMOVE THIS DEBUG PRINT
             printf("Compute Worldgen Data GPU: [Thread %d] wx = %f, wz = %f\n", my_id, wx_f, wz_f);
@@ -367,12 +366,12 @@ max(_mn, min(_mx, _x)); })
             const int my_x = my_id % chunk_size_x;
             const int my_z = my_id / chunk_size_z;
             float v = 0.0f;
-            v += get_worldgen_data_at(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z, data).h_b;
-            v += get_worldgen_data_at(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z, data).h_b;
-            v += get_worldgen_data_at(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z, data).h_b;
-            v += get_worldgen_data_at(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z, data).h_b;
+            v += data[get_worldgen_data_at(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_worldgen_data_at(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_worldgen_data_at(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_worldgen_data_at(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
             v *= 0.25f;
-            data[my_id].h = v;
+            data[get_worldgen_data_at(my_x, my_z, chunk_size_x, chunk_size_z)].h = v;
         }
     }
 

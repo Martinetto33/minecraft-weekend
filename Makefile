@@ -15,9 +15,9 @@ CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Il
 CFLAGS += -Wno-error=implicit-function-declaration
 # Adding the environmental variable ALIN_CHUNKS_SIZE as a compilation flag; it's used in the world/world.c file
 CFLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
-LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm -L/opt/cuda/nvvm/lib64 -lcudart
+LDFLAGS = lib/glad/src/glad.o lib/cglm/libcglm.a lib/glfw/src/libglfw3.a lib/noise/libnoise.a -lm
 
-CUDA_FLAGS = -g -G -Xcompiler
+CUDA_FLAGS = -g -G
 CUDA_FLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise #-fbracket-depth=1024
 CUDA_FLAGS += -DALIN_CHUNKS_SIZE=$(CHUNKS_SIZE)
 # GLFW required frameworks on OSX
@@ -42,7 +42,7 @@ all: dirs libs game
 
 libs:
 	cd lib/cglm && cmake . -DCGLM_STATIC=ON && make
-	cd lib/glad && $(CC) -o src/glad.o -Iinclude -c src/glad.c
+	cd lib/glad && $(C_COMPILER) -o src/glad.o -Iinclude -c src/glad.c
 	cd lib/glfw && cmake . && make
 	cd lib/noise && make
 
@@ -52,12 +52,16 @@ dirs:
 run: all
 	$(BIN)/game
 
-game: $(OBJ)
+game: $(OBJ) gpuCode.o
 	$(CUDA_COMPILER) -o $(BIN)/game $^ $(LDFLAGS)
 
-# Rule for compiling CUDA files with nvcc
+# Rule to link separately the gpu-code
+gpuCode.o: $(CUDA_OBJ)
+	$(CUDA_COMPILER) -arch=sm_75 -dlink $(CUDA_OBJ) -o gpuCode.o -L/opt/cuda/nvvm/lib64 -lcudart
+
+# Rule for compiling CUDA files with nvcc; the -x option specifies the language to use for compilation (cu means CUDA)
 %.o: %.cu
-	$(CUDA_COMPILER) -dc $< -o $@ $(CUDA_FLAGS)
+	$(CUDA_COMPILER) -x cu -dc $< -o $@ $(CUDA_FLAGS)
 
 %.o: %.c
 	$(C_COMPILER) -o $@ -c $< $(CFLAGS)
