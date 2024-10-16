@@ -511,14 +511,14 @@ max(_mn, min(_mx, _x)); })
       unsigned long *d_array_of_partial_results;
       cudaSafeCall(cudaMalloc((void **) &d_array_of_partial_results, gpu_blocks * sizeof(unsigned long)));
 
-      /*generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
+      generate_blocks_gpu<<<gpu_blocks, BLKDIM>>>(
         d_data,
         d_blocks,
         chunk_size_x, chunk_size_y, chunk_size_z,
         chunk_world_position_y,
         blocks_to_generate,
         d_array_of_partial_results
-      );*/
+      );
       cudaCheckError();
       cudaSafeCall(cudaMemcpy(h_blocks, d_blocks, total_blocks_size, cudaMemcpyDeviceToHost));
       cudaSafeCall(cudaMemcpy(h_array_of_partial_results, d_array_of_partial_results, gpu_blocks * sizeof(unsigned long), cudaMemcpyDeviceToHost));
