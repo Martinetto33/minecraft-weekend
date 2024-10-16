@@ -434,7 +434,7 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     }
 
     for (unsigned long i = 0; i < result.blocks_number; i++) {
-        const int x = i & CHUNK_SIZE.x;
+        const int x = i % CHUNK_SIZE.x;
         const int y = i / (CHUNK_SIZE.x * CHUNK_SIZE.z);
         const int completed_xz_planes_elements = y * CHUNK_SIZE.x * CHUNK_SIZE.z;
         const int z = (i - completed_xz_planes_elements) / CHUNK_SIZE.x;
@@ -442,6 +442,6 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     }
 
     // Free the memory
-    free(result.blocks);
-    free(result.data);
+    //free(result.blocks);
+    //free(result.data);
 }
