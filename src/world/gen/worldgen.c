@@ -442,6 +442,6 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     }
 
     // Free the memory
-    //free(result.blocks);
-    //free(result.data);
+    free(result.blocks);
+    free(result.data);
 }
