@@ -414,13 +414,24 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
         heightmap->flags.generated = true;
     } else {
         // Worldgen data exist, so they must be converted to CUDA_WORLDGEN_DATA. A cast should be enough.
+        const int number_of_block_columns = CHUNK_SIZE.x * CHUNK_SIZE.z;
+        CUDA_WORLDGEN_DATA *data_to_send = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * number_of_block_columns);
+        for (int i = 0; i < number_of_block_columns; i++) {
+            CUDA_WORLDGEN_DATA data;
+            data.h_b = heightmap->worldgen_data[i].h_b;
+            data.b = heightmap->worldgen_data[i].b;
+            data.h = heightmap->worldgen_data[i].h;
+            data_to_send[i] = data;
+        }
         result = generateBlocks(
             CHUNK_SIZE.x, CHUNK_SIZE.y, CHUNK_SIZE.z,
             chunk->position.x, chunk->position.y, chunk->position.z,
             chunk->world->seed, ivec3shash(chunk->offset),
             false,
-            (CUDA_WORLDGEN_DATA *) heightmap->worldgen_data
+            data_to_send
         );
+        // No free is needed, because data_to_send will be modified directly in the generateBlocks function
+        // free(data_to_send);
     }
     // Extracting the heightmap from the result
     const int bottom_blocks = CHUNK_SIZE.x * CHUNK_SIZE.z;

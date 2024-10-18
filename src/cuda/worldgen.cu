@@ -319,7 +319,7 @@ max(_mn, min(_mx, _x)); })
       cudaFree(expscales);
     }
 
-    __device__ __forceinline__ int get_worldgen_data_at(unsigned int x, unsigned int z, int chunk_size_x, int chunk_size_z) {
+    __device__ __forceinline__ int get_index_from_coordinates(unsigned int x, unsigned int z, int chunk_size_x, int chunk_size_z) {
         return clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
     }
 
@@ -367,15 +367,23 @@ max(_mn, min(_mx, _x)); })
                 .b = biome_id
             };
             __syncthreads(); // barrier synchronisation needed to avoid race conditions
+            // TODO: CHECK THESE POTENTIALLY DANGEROUS LINES, CAST FROM INT TO UNSIGNED INT
             const unsigned int my_x = my_id % chunk_size_x;
-            const unsigned int my_z = my_id / chunk_size_z;
+            const unsigned int my_z = my_id / chunk_size_x;
+            assert(my_z < chunk_size_z);
+            /*const int down_left = get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z);
+            const int down_right = get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z);
+            const int up_left = get_index_from_coordinates(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z);
+            const int up_right = get_index_from_coordinates(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z);
+            printf("[Thread %u]: down_left = %d, down_right = %d, up_left = %d, up_right = %d\n", my_id, down_left, down_right, up_left, up_right);*/
             float v = 0.0f;
-            v += data[get_worldgen_data_at(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
-            v += data[get_worldgen_data_at(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
-            v += data[get_worldgen_data_at(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
-            v += data[get_worldgen_data_at(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_index_from_coordinates(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
+            v += data[get_index_from_coordinates(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z)].h_b;
             v *= 0.25f;
-            data[get_worldgen_data_at(my_x, my_z, chunk_size_x, chunk_size_z)].h = __float2ll_rz(v);
+            assert(!isnan(v));
+            data[get_index_from_coordinates(my_x, my_z, chunk_size_x, chunk_size_z)].h = __float2ll_rz(v);
             //printf("GPU: Worldgen Data[%u]: h_b = %f, h = %ld, b = %ld \n", my_id, data[my_id].h_b, data[my_id].h, data[my_id].b);
         }
     }
@@ -397,6 +405,7 @@ max(_mn, min(_mx, _x)); })
         const unsigned int global_index = blockIdx.x * blockDim.x + threadIdx.x;
         if (global_index < total_blocks_number) {
             const unsigned int my_x = global_index % chunk_size_x;
+            // y theoretically should not be negative, since we're considering coordinates within a chunk
             const unsigned int my_y = global_index / (chunk_size_x * chunk_size_z);
             const unsigned int completed_xz_planes_elements = my_y * chunk_size_x * chunk_size_z;
             const unsigned int my_z = (global_index - completed_xz_planes_elements) / chunk_size_x;
@@ -408,7 +417,8 @@ max(_mn, min(_mx, _x)); })
             const long h = my_data.h;
             const CudaBiome biome = (CudaBiome)my_data.b;
             if (!(biome >= 0 && biome < BIOME_LAST + 1)) {
-                printf("[Thread %d]: biome = %d\n", global_index, biome);
+                //printf("[Thread %d]: biome = %d\n", global_index, biome);
+                //printf("[Thread %u] my_xz = %u, worldgen data = { h_b = %f, h = %ld, b = %ld }\n", global_index, my_xz, my_data.h_b, my_data.h, my_data.b);
                 assert(false);
             }
             const CudaBiomeData biome_data = device_biome_data[biome];
@@ -455,6 +465,11 @@ max(_mn, min(_mx, _x)); })
      * This function generates blocks for a single chunk.
      * parameter_data is an array of CUDA_WORLDGEN_DATA, in case they were already
      * generated. Its size is chunk_size_x * chunk_size_z.
+     *
+     * WARNING: this function modifies directly the memory area pointed by the
+     * parameter_data. This violates good programming practices, but avoids the
+     * necessity of allocating a new array and copying manually the elements one
+     * by one. Watch out with the free()s!
      * */
     CUDA_RESULT generateBlocks(int chunk_size_x, int chunk_size_y, int chunk_size_z,
                                int chunk_world_position_x, int chunk_world_position_y, int chunk_world_position_z,
@@ -479,7 +494,7 @@ max(_mn, min(_mx, _x)); })
           was_environment_initialised = true;
       }
 
-      CUDA_WORLDGEN_DATA *h_data = parameter_data;
+      CUDA_WORLDGEN_DATA *h_data = parameter_data; // WATCH OUT: FREEING h_data will cause the memory pointed by parameter_data to be freed as well!
       CUDA_WORLDGEN_DATA *d_data;
       cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
 
@@ -507,6 +522,10 @@ max(_mn, min(_mx, _x)); })
       } else {
           // If the data had to be generated, then they're already in the device memory; otherwise, they need to be copied
           printf("No worldgen data need to be generated!\n");
+          printf("RECEIVED WORLDGEN DATA: \n");
+          for (int i = 0; i < chunk_size_x * chunk_size_z; i+=10) {
+              printf("received_h_data[%d]: h_b = %f, h = %ld, b = %ld \n", i, h_data[i].h_b, h_data[i].h, h_data[i].b);
+          }
           cudaSafeCall(cudaMemcpy(d_data, h_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
       }
 
