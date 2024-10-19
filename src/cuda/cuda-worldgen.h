@@ -49,7 +49,7 @@ extern "C" {
      * which is 32x32 = 1024 in the original configuration of the project.
      * */
     typedef struct cudaChunkResult {
-        unsigned long blocks_number;
+        int blocks_number;
         enum CudaBlockId *blocks;
         CUDA_WORLDGEN_DATA *data;
     } CUDA_RESULT;
