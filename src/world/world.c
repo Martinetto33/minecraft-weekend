@@ -311,8 +311,8 @@ int count_null_chunks(struct World *self);
 // Attempt to load any NULL chunks
 static void load_empty_chunks(struct World *self) {
 
-    printf("In function load_empty_chunks: empty chunks = %d.\n", count_null_chunks(self));
-    printf("All chunks: %zu\n", self->chunks_size);
+    //printf("In function load_empty_chunks: empty chunks = %d.\n", count_null_chunks(self));
+    //printf("All chunks: %zu\n", self->chunks_size);
     const double starting_time = hpc_gettime();
     world_foreach_offset_ftb(self, i, offset) {
         if (self->chunks[i] == NULL &&
@@ -325,7 +325,7 @@ static void load_empty_chunks(struct World *self) {
     const double end_time = hpc_gettime();
     const double elapsed_time = end_time - starting_time;
     printf("Elapsed time: %f\n", elapsed_time);
-    printf("Empty chunks after generation = %d.\n", count_null_chunks(self));
+    //printf("Empty chunks after generation = %d.\n", count_null_chunks(self));
 }
 
 // ALIN

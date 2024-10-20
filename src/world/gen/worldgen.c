@@ -419,7 +419,7 @@ void print_binary_representation(enum CudaBlockId cuda_id, enum BlockId block) {
 }
 
 void cuda_worldgen_generate(struct Chunk *chunk) {
-    printf("Now processing chunk with world coordinates: x = %d, y = %d, z = %d\n", chunk->position.x, chunk->position.y, chunk->position.z);
+    //printf("Now processing chunk with world coordinates: x = %d, y = %d, z = %d\n", chunk->position.x, chunk->position.y, chunk->position.z);
     struct Heightmap *heightmap = chunk_get_heightmap(chunk);
     CUDA_RESULT result;
     const int bottom_blocks = CHUNK_SIZE.x * CHUNK_SIZE.z;
@@ -463,7 +463,7 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
         // free(data_to_send);
     }
 
-    printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
+    //printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
     int non_air_placed_blocks = 0;
     const int all_blocks = CHUNK_SIZE.x * CHUNK_SIZE.y * CHUNK_SIZE.z;
     for (int i = 0; i < all_blocks; i++) {
