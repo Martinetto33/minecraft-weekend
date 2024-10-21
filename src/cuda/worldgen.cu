@@ -323,6 +323,7 @@ max(_mn, min(_mx, _x)); })
         return clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
     }
 
+    // TODO: DEBUG FUNCTION, REMOVE
     __device__ __forceinline__ void check_neighbour(const int heightmap_index) {
         const unsigned int first_index_in_next_block = (blockIdx.x + 1) * blockDim.x;
         const unsigned int first_index_in_this_block = blockIdx.x * blockDim.x;
@@ -373,9 +374,9 @@ max(_mn, min(_mx, _x)); })
 
             data[my_id].h_b = ((h * 32.0f) + (n * 256.0f)) * biome.scale + (biome.roughness * r * 2.0f);
             data[my_id].b = biome_id;
-            __syncthreads(); // barrier synchronisation needed to avoid race conditions
+            //__syncthreads(); // barrier synchronisation needed to avoid race conditions
             // TODO: CHECK THESE POTENTIALLY DANGEROUS LINES, CAST FROM INT TO UNSIGNED INT
-            const unsigned int my_x = my_id % chunk_size_x;
+            /*const unsigned int my_x = my_id % chunk_size_x;
             const unsigned int my_z = my_id / chunk_size_x;
             assert(my_z < chunk_size_z);
             const int down_left = get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z);
@@ -386,7 +387,7 @@ max(_mn, min(_mx, _x)); })
             check_neighbour(down_right);
             check_neighbour(up_left);
             check_neighbour(up_right);
-            /*printf("[Thread %u]: down_left = %d, down_right = %d, up_left = %d, up_right = %d\n", my_id, down_left, down_right, up_left, up_right);*/
+            //printf("[Thread %u]: down_left = %d, down_right = %d, up_left = %d, up_right = %d\n", my_id, down_left, down_right, up_left, up_right);
             float v = 0.0f;
             v += data[get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
             v += data[get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z)].h_b;
@@ -395,8 +396,33 @@ max(_mn, min(_mx, _x)); })
             v *= 0.25f;
             assert(!isnan(v));
             data[get_index_from_coordinates(my_x, my_z, chunk_size_x, chunk_size_z)].h = __float2ll_rz(v);
-            //printf("GPU: Worldgen Data[%u]: h_b = %f, h = %ld, b = %ld \n", my_id, data[my_id].h_b, data[my_id].h, data[my_id].b);
+            //printf("GPU: Worldgen Data[%u]: h_b = %f, h = %ld, b = %ld \n", my_id, data[my_id].h_b, data[my_id].h, data[my_id].b);*/
         }
+    }
+
+    __global__ void stencil_compute_v(CUDA_WORLDGEN_DATA *data, const int chunk_size_x, const int chunk_size_z) {
+        const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x;
+        const unsigned int my_x = my_id % chunk_size_x;
+        const unsigned int my_z = my_id / chunk_size_x;
+        assert(my_z < chunk_size_z);
+        const int down_left = get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z);
+        const int down_right = get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z);
+        const int up_left = get_index_from_coordinates(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z);
+        const int up_right = get_index_from_coordinates(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z);
+        //check_neighbour(down_left);
+        //check_neighbour(down_right);
+        //check_neighbour(up_left);
+        //check_neighbour(up_right);
+        /*printf("[Thread %u]: down_left = %d, down_right = %d, up_left = %d, up_right = %d\n", my_id, down_left, down_right, up_left, up_right);*/
+        float v = 0.0f;
+        v += data[down_left].h_b;
+        v += data[down_right].h_b;
+        v += data[up_left].h_b;
+        v += data[up_right].h_b;
+        v *= 0.25f;
+        assert(!isnan(v));
+        data[get_index_from_coordinates(my_x, my_z, chunk_size_x, chunk_size_z)].h = __float2ll_rz(v);
+        //printf("GPU: Worldgen Data[%u]: h_b = %f, h = %ld, b = %ld \n", my_id, data[my_id].h_b, data[my_id].h, data[my_id].b);
     }
 
     __global__ void generate_blocks_gpu(
@@ -476,6 +502,10 @@ max(_mn, min(_mx, _x)); })
         }
     }
 
+    __global__ void stupid_kernel(CUDA_WORLDGEN_DATA *data) {
+        printf("Stuhped\n");
+    }
+
     /*
      * This function generates blocks for a single chunk.
      * parameter_data is an array of CUDA_WORLDGEN_DATA, in case they were already
@@ -512,30 +542,35 @@ max(_mn, min(_mx, _x)); })
       CUDA_WORLDGEN_DATA *h_data = parameter_data; // WATCH OUT: FREEING h_data will cause the memory pointed by parameter_data to be freed as well!
       CUDA_WORLDGEN_DATA *d_data;
       cudaSafeCall(cudaMalloc((void**)&d_data, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
-      //cudaSafeCall(cudaMemset(d_data, 0, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
-      //cudaSafeCall(cudaDeviceSynchronize());
 
       if (must_generate_worldgen_data) {
-        h_data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
+          h_data = (CUDA_WORLDGEN_DATA *)malloc(sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z);
+          //cudaSafeCall(cudaMemset(d_data, 0, chunk_size_x * chunk_size_z * sizeof(CUDA_WORLDGEN_DATA)));
+          //cudaSafeCall(cudaDeviceSynchronize());
 
-        /* Bottom blocks of the chunk (usually 32 * 32) */
-        const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
-        const int gpu_blocks_for_worldgen_data = calculate_gpu_blocks(bottom_blocks_to_generate);
-        compute_worldgen_data_gpu<<<gpu_blocks_for_worldgen_data, BLKDIM>>>(
-            d_data,
-            chunk_size_x, chunk_size_z,
-            chunk_size_x * chunk_size_z,
-            chunk_world_position_x, chunk_world_position_z,
-            world_seed,
-            expscales
-        );
-        cudaCheckError();
-        // TEST: remove this
-        /*cudaSafeCall(cudaMemcpy(h_data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
-        for (int i = 0; i < chunk_size_x * chunk_size_z; i++) {
-            printf("h_data[%d]: h_b = %f, h = %ld, b = %ld\n", i, h_data[i].h_b, h_data[i].h, h_data[i].b);
-        }*/
-        cudaSafeCall(cudaMemcpy(h_data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
+          /* Bottom blocks of the chunk (usually 32 * 32) */
+          const int bottom_blocks_to_generate = chunk_size_x * chunk_size_z;
+          const int gpu_blocks_for_worldgen_data = calculate_gpu_blocks(bottom_blocks_to_generate);
+
+          compute_worldgen_data_gpu<<<gpu_blocks_for_worldgen_data, BLKDIM>>>(
+              d_data,
+              chunk_size_x, chunk_size_z,
+              chunk_size_x * chunk_size_z,
+              chunk_world_position_x, chunk_world_position_z,
+              world_seed,
+              expscales
+          );
+          cudaCheckError();
+          // This stencil computation is done in a separate kernel to ensure all the blocks have finished
+          // writing the necessary h_b values in the worldgen data
+          stencil_compute_v<<<gpu_blocks_for_worldgen_data, BLKDIM>>>(d_data, chunk_size_x, chunk_size_z);
+          cudaCheckError();
+          // TEST: remove this
+          /*cudaSafeCall(cudaMemcpy(h_data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
+          for (int i = 0; i < chunk_size_x * chunk_size_z; i++) {
+              printf("h_data[%d]: h_b = %f, h = %ld, b = %ld\n", i, h_data[i].h_b, h_data[i].h, h_data[i].b);
+          }*/
+          cudaSafeCall(cudaMemcpy(h_data, d_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyDeviceToHost));
       } else {
           // If the data had to be generated, then they're already in the device memory; otherwise, they need to be copied
           /*printf("No worldgen data need to be generated!\n");
@@ -544,6 +579,7 @@ max(_mn, min(_mx, _x)); })
               printf("received_h_data[%d]: h_b = %f, h = %ld, b = %ld \n", i, h_data[i].h_b, h_data[i].h, h_data[i].b);
           }*/
           cudaSafeCall(cudaMemcpy(d_data, h_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
+          stupid_kernel<<<1, 1>>>(d_data);
       }
 
       CudaBlockId *d_blocks;

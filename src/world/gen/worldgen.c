@@ -475,6 +475,7 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
             const int y = i / bottom_blocks;
             const int completed_xz_planes_elements = y * bottom_blocks;
             const int z = (i - completed_xz_planes_elements) / CHUNK_SIZE.x;
+            //printf("Setting block %d at coordinates {%d, %d, %d}\n", result.blocks[i], y, x, z);
             chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
             non_air_placed_blocks++;
         }

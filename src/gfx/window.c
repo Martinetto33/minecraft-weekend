@@ -156,7 +156,7 @@ void window_loop() {
 
     // TODO: Alin added this variable, remove it from while!
     int i = 0;
-    while (!glfwWindowShouldClose(window.handle) && i++ < 30) {
+    while (!glfwWindowShouldClose(window.handle) /*&& i++ < 1*/) {
         const u64 now = NOW();
 
         window.frame_delta = now - window.last_frame;
