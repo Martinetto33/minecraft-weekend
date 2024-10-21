@@ -38,7 +38,7 @@ extern "C" {
 
     typedef struct CudaWorldgenData {
         float h_b;
-        long h, b;
+        long long h, b;
     } CUDA_WORLDGEN_DATA;
 
     /*

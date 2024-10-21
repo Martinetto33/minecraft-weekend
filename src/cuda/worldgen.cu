@@ -452,7 +452,7 @@ max(_mn, min(_mx, _x)); })
             // it only contains values for columns, not for all the blocks!
             const CUDA_WORLDGEN_DATA my_data = data[my_xz];
             //printf("[Thread %u] my_xz = %u, worldgen data = { h_b = %f, h = %ld, b = %ld }\n", global_index, my_xz, my_data.h_b, my_data.h, my_data.b);
-            const long h = my_data.h;
+            const long long h = my_data.h;
             const auto biome = static_cast<CudaBiome>(my_data.b);
             if (!(biome >= 0 && biome < BIOME_LAST + 1)) {
                 //printf("[Thread %d]: biome = %d\n", global_index, biome);

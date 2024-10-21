@@ -463,19 +463,33 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
         // free(data_to_send);
     }
 
+    // Opening a file to log information
+    FILE *fp = fopen("/home/alinb/Desktop/alin-log.txt", "w");
+    if (fp == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    fprintf(fp, "---- Processing chunk {x = %d, y = %d, z = %d} ----\n\n", chunk->position.x, chunk->position.y, chunk->position.z);
+    // Printing heightmap
+    fprintf(fp, "---- HEIGHTMAP ----\n");
+    for (int i = 0; i < bottom_blocks; i++) {
+        const struct WorldgenData bottom_data = heightmap->worldgen_data[i];
+        fprintf(fp, "[x = %d, z = %d] {h_b = %f, h = %lld, b = %lld}\n", i % CHUNK_SIZE.x, i / CHUNK_SIZE.x, bottom_data.h_b, bottom_data.h, bottom_data.b);
+    }
+
     //printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
     int non_air_placed_blocks = 0;
     const int all_blocks = CHUNK_SIZE.x * CHUNK_SIZE.y * CHUNK_SIZE.z;
     for (int i = 0; i < all_blocks; i++) {
-        if (non_air_placed_blocks >= result.blocks_number) {
+        /*if (non_air_placed_blocks >= result.blocks_number) {
             break;
-        }
+        }*/
         if (result.blocks[i] != CUDA_AIR) {
             const int x = i % CHUNK_SIZE.x;
             const int y = i / bottom_blocks;
             const int completed_xz_planes_elements = y * bottom_blocks;
             const int z = (i - completed_xz_planes_elements) / CHUNK_SIZE.x;
-            //printf("Setting block %d at coordinates {%d, %d, %d}\n", result.blocks[i], y, x, z);
+            fprintf(fp, "Setting block %d at coordinates {%d, %d, %d}\n", result.blocks[i], y, x, z);
             chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
             non_air_placed_blocks++;
         }
@@ -486,4 +500,8 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     // Free the memory
     free(result.blocks);
     free(result.data);
+    if (fclose(fp) != 0) {
+        perror("Error closing file");
+        exit(EXIT_FAILURE);
+    }
 }
