@@ -522,10 +522,6 @@ max(_mn, min(_mx, _x)); })
         }
     }
 
-    __global__ void stupid_kernel(CUDA_WORLDGEN_DATA *data) {
-        printf("Stuhped\n");
-    }
-
     /*
      * This function generates blocks for a single chunk.
      * parameter_data is an array of CUDA_WORLDGEN_DATA, in case they were already
@@ -599,7 +595,6 @@ max(_mn, min(_mx, _x)); })
               printf("received_h_data[%d]: h_b = %f, h = %ld, b = %ld \n", i, h_data[i].h_b, h_data[i].h, h_data[i].b);
           }*/
           cudaSafeCall(cudaMemcpy(d_data, h_data, sizeof(CUDA_WORLDGEN_DATA) * chunk_size_x * chunk_size_z, cudaMemcpyHostToDevice));
-          stupid_kernel<<<1, 1>>>(d_data);
       }
 
       CudaBlockId *d_blocks;

@@ -463,20 +463,6 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
         // free(data_to_send);
     }
 
-    // Opening a file to log information
-    FILE *fp = fopen("/home/alinb/Desktop/alin-log.txt", "w");
-    if (fp == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-    fprintf(fp, "---- Processing chunk {x = %d, y = %d, z = %d} ----\n\n", chunk->position.x, chunk->position.y, chunk->position.z);
-    // Printing heightmap
-    fprintf(fp, "---- HEIGHTMAP ----\n");
-    for (int i = 0; i < bottom_blocks; i++) {
-        const struct WorldgenData bottom_data = heightmap->worldgen_data[i];
-        fprintf(fp, "[x = %d, z = %d] {h_b = %f, h = %lld, b = %lld}\n", i / CHUNK_SIZE.x, i % CHUNK_SIZE.x, bottom_data.h_b, bottom_data.h, bottom_data.b);
-    }
-
     //printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
     int non_air_placed_blocks = 0;
     for (int x = 0; x < CHUNK_SIZE.x; x++) {
@@ -484,7 +470,6 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
             for (int y = 0; y < CHUNK_SIZE.y; y++) {
                 const int i = x * CHUNK_SIZE.y * CHUNK_SIZE.z + z * CHUNK_SIZE.z + y;
                 if (result.blocks[i] != CUDA_AIR) {
-                    fprintf(fp, "Setting block %d at coordinates {%d, %d, %d}, iteration = %d\n", result.blocks[i], x, y, z, y + z * CHUNK_SIZE.y + x * CHUNK_SIZE.y * CHUNK_SIZE.z);
                     chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
                 }
             }
@@ -496,8 +481,4 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     // Free the memory
     free(result.blocks);
     free(result.data);
-    if (fclose(fp) != 0) {
-        perror("Error closing file");
-        exit(EXIT_FAILURE);
-    }
 }
