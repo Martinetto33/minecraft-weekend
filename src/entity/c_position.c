@@ -5,8 +5,6 @@
 static void tick(struct PositionComponent *c_position, struct Entity entity) {
     ivec3s block = world_pos_to_block(c_position->position);
     ivec3s offset = world_pos_to_offset(block);
-    // TODO: REMOVE
-    printf("ALIN: OFFSET - x = %d, y = %d, z = %d\n", offset.x, offset.y, offset.z);
 
     if (ivec3scmp(block, c_position->block)) {
         c_position->block = block;

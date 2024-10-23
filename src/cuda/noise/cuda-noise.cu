@@ -1,6 +1,5 @@
     #include "cuda-noise.cuh"
 
-    #include <cstdio>
     /* This file is basically a merge of jdah's noise library and libnoise found under lib/noise/ */
 
     #ifdef __cplusplus
@@ -112,26 +111,6 @@
 
         //---------------------------------------------------------------------
 
-        __device__ void check_for_nan(const int num_args, const char *caller, const float seed, const float x, const float z, ...) {
-            va_list args;
-            va_start(args, num_args);  // Initialize va_list for num_args arguments
-
-            int detected_NaNs = 0;
-            // Loop through all arguments
-            for (int i = 0; i < num_args; i++) {
-                const float arg = va_arg(args, float);  // Get the next argument (assuming it's a double)
-                // Check if this argument is NaN
-                if (isnan(arg)) {
-                    printf("NaN detected! [Thread Id: %u] Caller: %s, NaN argument index = %d\n", blockIdx.x * blockDim.x + threadIdx.x, caller, i);
-                    detected_NaNs++;
-                }
-            }
-            if (detected_NaNs > 0) {
-                printf("Complete info: [Thread Id: %u] Caller: %s, seed = %f, x = %f, z = %f, detected NaNs = %d\n", blockIdx.x * blockDim.x + threadIdx.x, caller, seed, x, z, detected_NaNs);
-            }
-            va_end(args);  // Clean up the va_list
-        }
-
         __device__ static int sign(const float n) {
             return (n > EPSILON_ALIN) - (n < -EPSILON_ALIN);
         }
@@ -144,9 +123,6 @@
                 v += (1.0f / u) * cuda_noise3((x / 1.01f) * u, (z / 1.01f) * u, seed + (this->o * 32));
                 u *= 2.0f;
             }
-            /* DEBUG INFO; TODO: REMOVE */
-            check_for_nan(1, "Octave Compute", seed, x, z, v);
-            /* END OF DEBUG INFO; TODO: REMOVE */
             return v;
         }
 
@@ -156,11 +132,7 @@
         }
 
         __device__ float CudaCombined::compute(const float seed, const float x, const float z) {
-            const float result = this->n->compute(seed, x + this->m->compute(seed, x, z), z);
-            /* DEBUG INFO; TODO: REMOVE */
-            check_for_nan(1, "Combined compute", seed, x, z, result);
-            /* END OF DEBUG INFO; TODO: REMOVE */
-            return result;
+            return this->n->compute(seed, x + this->m->compute(seed, x, z), z);
         }
 
         __device__ CudaCombined::CudaCombined(CudaNoise *n, CudaNoise *m) {
@@ -169,11 +141,7 @@
         }
 
         __device__ float CudaBasic::compute(const float seed, const float x, const float z) {
-            const float result = cuda_noise3(x, z, seed + (this->o * 32.0f));
-            /* DEBUG INFO; TODO: REMOVE */
-            check_for_nan(1, "Basic Compute", seed, x, z, result);
-            /* END OF DEBUG INFO; TODO: REMOVE */
-            return result;
+            return cuda_noise3(x, z, seed + (this->o * 32.0f));
         }
 
         __device__ CudaBasic::CudaBasic(const int o) {
@@ -182,11 +150,7 @@
 
         __device__ float CudaExpScale::compute(const float seed, const float x, const float z) {
             const float n = this->n->compute(seed, x * this->scale, z * this->scale);
-            const float result = sign(n) * powf(fabsf(n), this->exp);
-            /* DEBUG INFO; TODO: REMOVE */
-            check_for_nan(2, "Cuda Expscale", seed, x, z, n, result);
-            /* END OF DEBUG INFO; TODO: REMOVE */
-            return result;
+            return sign(n) * powf(fabsf(n), this->exp);
         }
 
         __device__ CudaExpScale::CudaExpScale(CudaNoise *n, const float exp, const float scale) {

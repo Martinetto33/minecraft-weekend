@@ -3,6 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/**
+ * This file is here only for hypothetical future extensions.
+ * If I ever want to add decorations to the generated world, this file
+ * contains helpful tools for initialising a random generator on the GPU.
+ *
+ * The calculate_gpu_blocks() is the only function here that's actually
+ * used in the code.
+ */
 
 #ifdef __cplusplus
 extern "C" {

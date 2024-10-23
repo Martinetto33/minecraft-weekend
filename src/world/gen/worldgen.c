@@ -267,7 +267,7 @@ static void _set(struct Chunk *chunk, s32 x, s32 y, s32 z, u32 d) {
 
 
 void worldgen_generate(struct Chunk *chunk) {
-    //SRAND(chunk->world->seed + ivec3shash(chunk->offset));
+    SRAND(chunk->world->seed + ivec3shash(chunk->offset));
 
     struct Heightmap *heightmap = chunk_get_heightmap(chunk);
 
@@ -383,7 +383,7 @@ void worldgen_generate(struct Chunk *chunk) {
 
                 chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, block);
 
-                /*if (y_w == h) {
+                if (y_w == h) {
                     // decorate
                     for (size_t i = 0; i < MAX_DECORATIONS; i++) {
                         if (biome_data.decorations[i].f == NULL) {
@@ -394,32 +394,13 @@ void worldgen_generate(struct Chunk *chunk) {
                             biome_data.decorations[i].f(chunk, _get, _set, x, y, z);
                         }
                     }
-                }*/
+                }
             }
         }
     }
 }
 
-// TODO: REMOVE THIS FUNCTION
-void print_binary_representation(enum CudaBlockId cuda_id, enum BlockId block) {
-    int cuda_bits = sizeof(cuda_id) * 8, jdah_bits = sizeof(block) * 8;
-    printf("Binary representation of cuda_id %d: ", cuda_id);
-    for (int i = cuda_bits - 1; i >= 0; i--) {
-        int bit = (cuda_id >> i) & 1;
-        printf("%d", bit);
-    }
-    printf("\n");
-
-    printf("Binary representation of block %d: ", block);
-    for (int i = jdah_bits - 1; i >= 0; i--) {
-        int bit = (block >> i) & 1;
-        printf("%d", bit);
-    }
-    printf("\n");
-}
-
 void cuda_worldgen_generate(struct Chunk *chunk) {
-    //printf("Now processing chunk with world coordinates: x = %d, y = %d, z = %d\n", chunk->position.x, chunk->position.y, chunk->position.z);
     struct Heightmap *heightmap = chunk_get_heightmap(chunk);
     CUDA_RESULT result;
     const int bottom_blocks = CHUNK_SIZE.x * CHUNK_SIZE.z;
@@ -460,10 +441,8 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
         );
         // No free is needed, because data_to_send will be returned in the result by generateBlocks(),
         // and a free is performed at the end of this function.
-        // free(data_to_send);
     }
 
-    //printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
     int non_air_placed_blocks = 0;
     for (int x = 0; x < CHUNK_SIZE.x; x++) {
         for (int z = 0; z < CHUNK_SIZE.z; z++) {
@@ -471,12 +450,13 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
                 const int i = x * CHUNK_SIZE.y * CHUNK_SIZE.z + z * CHUNK_SIZE.z + y;
                 if (result.blocks[i] != CUDA_AIR) {
                     chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
+                    /*if (++non_air_placed_blocks >= result.blocks_number) {
+                        break;
+                    }*/ // I wasn't able to make this work; the idea was to break the cycle if the only remaining blocks were air.
                 }
             }
         }
     }
-
-    //print_binary_representation(CUDA_AIR, AIR);
 
     // Free the memory
     free(result.blocks);

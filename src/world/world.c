@@ -214,9 +214,8 @@ void world_load_chunk(struct World *self, ivec3s offset) {
     struct Chunk *chunk = malloc(sizeof(struct Chunk));
     chunk_init(chunk, self, offset);
     chunk->flags.generating = true;
-    //worldgen_generate(chunk);
+    //worldgen_generate(chunk); // uncomment this for the CPU version
     cuda_worldgen_generate(chunk);
-    printf("Cuda call in world.c/world_load_chunk() went ok!\n");
     // set blocks which were previously unloaded
     for (size_t i = 0; i < self->unloaded_blocks.size; i++) {
         struct WorldUnloadedBlock data = self->unloaded_blocks.list[i];
@@ -300,18 +299,9 @@ void world_remove_unloaded_block(struct World *self, size_t i) {
     }
 }
 
-/*******************/
-// Added by Alin
-// Remember: the static modifier in C means that only code in this file can
-// call that function
-int count_null_chunks(struct World *self);
-/*******************/
-
 // Attempt to load any NULL chunks
 static void load_empty_chunks(struct World *self) {
 
-    //printf("In function load_empty_chunks: empty chunks = %d.\n", count_null_chunks(self));
-    //printf("All chunks: %zu\n", self->chunks_size);
     const double starting_time = hpc_gettime();
     world_foreach_offset_ftb(self, i, offset) {
         if (self->chunks[i] == NULL &&
@@ -324,22 +314,6 @@ static void load_empty_chunks(struct World *self) {
     const double end_time = hpc_gettime();
     const double elapsed_time = end_time - starting_time;
     printf("Elapsed time: %f\n", elapsed_time);
-    //printf("Empty chunks after generation = %d.\n", count_null_chunks(self));
-}
-
-// ALIN
-// Counts the null chunks in the world struct.
-int count_null_chunks(struct World *self) {
-  int count = 0;
-  //printf("Chunks_size: %zu\n", self->chunks_size);
-  int total_chunks = pow(self->chunks_size, 3);
-  //	printf("Total chunks: %d\n", total_chunks);
-  for (size_t i = 0; i < total_chunks; i++) {
-    if (self->chunks[i] == NULL) {
-      count++;
-    }
-  }
-  return count;
 }
 
 // Centers the world's loaded chunks around the specified block position
