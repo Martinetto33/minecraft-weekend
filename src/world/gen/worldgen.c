@@ -474,24 +474,20 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
     fprintf(fp, "---- HEIGHTMAP ----\n");
     for (int i = 0; i < bottom_blocks; i++) {
         const struct WorldgenData bottom_data = heightmap->worldgen_data[i];
-        fprintf(fp, "[x = %d, z = %d] {h_b = %f, h = %lld, b = %lld}\n", i % CHUNK_SIZE.x, i / CHUNK_SIZE.x, bottom_data.h_b, bottom_data.h, bottom_data.b);
+        fprintf(fp, "[x = %d, z = %d] {h_b = %f, h = %lld, b = %lld}\n", i / CHUNK_SIZE.x, i % CHUNK_SIZE.x, bottom_data.h_b, bottom_data.h, bottom_data.b);
     }
 
     //printf("\n[Chunk: x = %d, y = %d, z = %d] Blocks number in CUDA_RESULT: %d\n", chunk->position.x, chunk->position.y, chunk->position.z, result.blocks_number);
     int non_air_placed_blocks = 0;
-    const int all_blocks = CHUNK_SIZE.x * CHUNK_SIZE.y * CHUNK_SIZE.z;
-    for (int i = 0; i < all_blocks; i++) {
-        /*if (non_air_placed_blocks >= result.blocks_number) {
-            break;
-        }*/
-        if (result.blocks[i] != CUDA_AIR) {
-            const int x = i % CHUNK_SIZE.x;
-            const int y = i / bottom_blocks;
-            const int completed_xz_planes_elements = y * bottom_blocks;
-            const int z = (i - completed_xz_planes_elements) / CHUNK_SIZE.x;
-            fprintf(fp, "Setting block %d at coordinates {%d, %d, %d}\n", result.blocks[i], y, x, z);
-            chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
-            non_air_placed_blocks++;
+    for (int x = 0; x < CHUNK_SIZE.x; x++) {
+        for (int z = 0; z < CHUNK_SIZE.z; z++) {
+            for (int y = 0; y < CHUNK_SIZE.y; y++) {
+                const int i = x * CHUNK_SIZE.y * CHUNK_SIZE.z + z * CHUNK_SIZE.z + y;
+                if (result.blocks[i] != CUDA_AIR) {
+                    fprintf(fp, "Setting block %d at coordinates {%d, %d, %d}, iteration = %d\n", result.blocks[i], x, y, z, y + z * CHUNK_SIZE.y + x * CHUNK_SIZE.y * CHUNK_SIZE.z);
+                    chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
+                }
+            }
         }
     }
 

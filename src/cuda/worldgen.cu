@@ -31,16 +31,14 @@ __typeof__ (mn) _mn = (mn); \
 __typeof__ (mx) _mx = (mx); \
 max(_mn, min(_mx, _x)); })
 #endif
+#define sign(_x) ({ __typeof__(_x) _xx = (_x);\
+((__typeof__(_x)) ( (((__typeof__(_x)) 0) < _xx) - (_xx < ((__typeof__(_x)) 0))));})
 
     bool was_environment_initialised = false;
     CudaBasic **bs = nullptr;
     CudaOctave **os = nullptr;
     CudaCombined **cs = nullptr;
     CudaExpScale **expscales = nullptr;
-
-    __device__ static int sign(const float n) {
-        return (n > EPSILON) - (n < -EPSILON);
-    }
 
 #define BIOME_LAST MOUNTAIN
     enum CudaBiome {
@@ -319,7 +317,7 @@ max(_mn, min(_mx, _x)); })
       cudaFree(expscales);
     }
 
-    __device__ __forceinline__ int get_index_from_coordinates(unsigned int x, unsigned int z, int chunk_size_x, int chunk_size_z) {
+    __device__ __forceinline__ int get_index_from_coordinates(int x, int z, int chunk_size_x, int chunk_size_z) {
         return clamp(x, 0, chunk_size_x - 1) * chunk_size_x + clamp(z, 0, chunk_size_z - 1);
     }
 
@@ -340,21 +338,18 @@ max(_mn, min(_mx, _x)); })
                                           unsigned long world_seed,
                                           CudaExpScale **expscales) {
         if (const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x; my_id < number_of_chunk_columns) {
-            const long long wx = chunk_world_position_x + (static_cast<long long>(my_id) % chunk_size_x);
-            const long long wz = chunk_world_position_z + (static_cast<long long>(my_id) / chunk_size_z);
-            const float wx_f = __ll2float_rz(wx); // rounding long long int to 0 in CUDA way
-            const float wz_f = __ll2float_rz(wz);
-            const float world_seed_f = __ull2float_rz(world_seed);
+            const long long wx = chunk_world_position_x + (static_cast<long long>(my_id) / chunk_size_x);
+            const long long wz = chunk_world_position_z + (static_cast<long long>(my_id) % chunk_size_z);
 
             // TODO: REMOVE THIS DEBUG PRINT
             //printf("Compute Worldgen Data GPU: [Thread %d] wx = %f, wz = %f\n", my_id, wx_f, wz_f);
 
-            float h = expscales[N_H]->compute(world_seed_f, wx_f, wz_f),
-                  m = expscales[N_M]->compute(world_seed_f, wx_f, wz_f) * 0.5f + 0.5f,
-                  t = expscales[N_T]->compute(world_seed_f, wx_f, wz_f) * 0.5f + 0.5f,
-                  r = expscales[N_R]->compute(world_seed_f, wx_f, wz_f),
-                  n = expscales[N_N]->compute(world_seed_f, wx_f, wz_f),
-                  p = expscales[N_P]->compute(world_seed_f, wx_f, wz_f);
+            float h = expscales[N_H]->compute(world_seed, wx, wz),
+                  m = expscales[N_M]->compute(world_seed, wx, wz) * 0.5f + 0.5f,
+                  t = expscales[N_T]->compute(world_seed, wx, wz) * 0.5f + 0.5f,
+                  r = expscales[N_R]->compute(world_seed, wx, wz),
+                  n = expscales[N_N]->compute(world_seed, wx, wz),
+                  p = expscales[N_P]->compute(world_seed, wx, wz);
 
 
             // add 'peak' noise to mountain noise
@@ -402,12 +397,12 @@ max(_mn, min(_mx, _x)); })
 
     __global__ void stencil_compute_v(CUDA_WORLDGEN_DATA *data, const int chunk_size_x, const int chunk_size_z) {
         const unsigned int my_id = blockIdx.x * blockDim.x + threadIdx.x;
-        const unsigned int my_x = my_id % chunk_size_x;
-        const unsigned int my_z = my_id / chunk_size_x;
-        assert(my_z < chunk_size_z);
+        const int my_x = static_cast<int>(my_id) / chunk_size_x;
+        const int my_z = static_cast<int>(my_id) % chunk_size_x;
+        assert(my_x < chunk_size_x);
         const int down_left = get_index_from_coordinates(my_x - 1, my_z - 1, chunk_size_x, chunk_size_z);
-        const int down_right = get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z);
-        const int up_left = get_index_from_coordinates(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z);
+        const int up_left = get_index_from_coordinates(my_x + 1, my_z - 1, chunk_size_x, chunk_size_z);
+        const int down_right = get_index_from_coordinates(my_x - 1, my_z + 1, chunk_size_x, chunk_size_z);
         const int up_right = get_index_from_coordinates(my_x + 1, my_z + 1, chunk_size_x, chunk_size_z);
         //check_neighbour(down_left);
         //check_neighbour(down_right);
@@ -421,7 +416,7 @@ max(_mn, min(_mx, _x)); })
         v += data[up_right].h_b;
         v *= 0.25f;
         assert(!isnan(v));
-        data[get_index_from_coordinates(my_x, my_z, chunk_size_x, chunk_size_z)].h = __float2ll_rz(v);
+        data[get_index_from_coordinates(my_x, my_z, chunk_size_x, chunk_size_z)].h = v;
         //printf("GPU: Worldgen Data[%u]: h_b = %f, h = %ld, b = %ld \n", my_id, data[my_id].h_b, data[my_id].h, data[my_id].b);
     }
 
@@ -439,15 +434,40 @@ max(_mn, min(_mx, _x)); })
         __shared__ int local_generated_blocks[BLKDIM];
         const unsigned int lindex = threadIdx.x; // local index
         local_generated_blocks[lindex] = 0;
-        const unsigned int global_index = blockIdx.x * blockDim.x + threadIdx.x;
+        const long long global_index = blockIdx.x * blockDim.x + threadIdx.x;
 
         if (global_index < total_blocks_number) {
-            const unsigned int my_x = global_index % chunk_size_x;
+            /**
+             * Axis orientation:
+             *
+             *     y
+             *     ↑
+             *     |   x
+             *     |  /
+             *     | /
+             *     |/
+             *     o ----------> z
+             * While in the array representation it's something like this:
+             *
+             *      [ y0 .............................. yn] z0      |
+             *      [ y0 .............................. yn] z1      |> x0
+             *      [ y0 .............................. yn] z2      |
+             *
+             *      [ y0 .............................. yn] z0      |
+             *      [ y0 .............................. yn] z1      |> x1
+             *      [ y0 .............................. yn] z2      |
+             *      ...
+             * The y is the one that varies the most, so it's found through the % operator.
+             * The z represents the other "bottom" axis, while the x varies the least
+             * of all the coordinates and represents the horizontal depth.
+             * Don't ask me why jdah reasoned like this. It took me two days to figure this out.
+             */
+            const long long my_y = global_index % chunk_size_x; // y is the coordinate that varies quicker
             // y theoretically should not be negative, since we're considering coordinates within a chunk
-            const unsigned int my_y = global_index / (chunk_size_x * chunk_size_z);
-            const unsigned int completed_xz_planes_elements = my_y * chunk_size_x * chunk_size_z;
-            const unsigned int my_z = (global_index - completed_xz_planes_elements) / chunk_size_x;
-            const unsigned int my_xz = my_z * chunk_size_x + my_x;
+            const long long my_x = global_index / (chunk_size_y * chunk_size_z);
+            const long long completed_yz_planes_elements = my_x * chunk_size_x * chunk_size_z;
+            const long long my_z = (global_index - completed_yz_planes_elements) / chunk_size_y;
+            const long long my_xz = my_x * chunk_size_x + my_z;
             // Data is an array of size chunk_size_x * chunk_size_z;
             // it only contains values for columns, not for all the blocks!
             const CUDA_WORLDGEN_DATA my_data = data[my_xz];
