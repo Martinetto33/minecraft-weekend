@@ -450,9 +450,9 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
                 const int i = x * CHUNK_SIZE.y * CHUNK_SIZE.z + z * CHUNK_SIZE.z + y;
                 if (result.blocks[i] != CUDA_AIR) {
                     chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
-                    /*if (++non_air_placed_blocks >= result.blocks_number) {
+                    if (++non_air_placed_blocks >= result.blocks_number) {
                         break;
-                    }*/ // I wasn't able to make this work; the idea was to break the cycle if the only remaining blocks were air.
+                    } // I wasn't able to make this work; the idea was to break the cycle if the only remaining blocks were air.
                 }
             }
         }

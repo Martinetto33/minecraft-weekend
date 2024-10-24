@@ -442,12 +442,8 @@ max(_mn, min(_mx, _x)); })
             if (y_w > h && y_w <= WATER_LEVEL) {
                 block = CUDA_WATER;
             } else if (y_w > h) {
-                blocks[global_index] = CUDA_AIR;
-                if (lindex != 0) {
-                    // Thread 0 of the block can't return, otherwise the reduction won't be performed
-                    return;
-                }
-                /* If thread 0 of the block generates an air block, decrease to -1 the value in the
+                block = CUDA_AIR;
+                /* If this thread of the block generates an air block, decrease to -1 the value in the
                  * local_generated_blocks array in position 0, so that the next instruction will
                  * increase it back to 0. This way, no new blocks are considered to be generated,
                  * but the partial reduction is computed nonetheless.
