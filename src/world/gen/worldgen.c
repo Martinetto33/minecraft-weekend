@@ -452,7 +452,7 @@ void cuda_worldgen_generate(struct Chunk *chunk) {
                     chunk_set_block(chunk, (ivec3s) {{ x, y, z }}, result.blocks[i]);
                     if (++non_air_placed_blocks >= result.blocks_number) {
                         break;
-                    } // I wasn't able to make this work; the idea was to break the cycle if the only remaining blocks were air.
+                    }
                 }
             }
         }
