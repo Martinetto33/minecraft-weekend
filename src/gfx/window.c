@@ -154,7 +154,8 @@ static void _render() {
 void window_loop() {
     _init();
 
-    while (!glfwWindowShouldClose(window.handle)) {
+    int i = 0;
+    while (!glfwWindowShouldClose(window.handle) && i++ < 10) {
         const u64 now = NOW();
 
         window.frame_delta = now - window.last_frame;

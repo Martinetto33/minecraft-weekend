@@ -215,7 +215,13 @@ void world_load_chunk(struct World *self, ivec3s offset) {
     chunk_init(chunk, self, offset);
     chunk->flags.generating = true;
     //worldgen_generate(chunk); // uncomment this for the CPU version
+    const double starting_time = hpc_gettime();
+
     cuda_worldgen_generate(chunk);
+
+    const double end_time = hpc_gettime();
+    const double elapsed_time = end_time - starting_time;
+    printf("Elapsed time: %f\n", elapsed_time);
     // set blocks which were previously unloaded
     for (size_t i = 0; i < self->unloaded_blocks.size; i++) {
         struct WorldUnloadedBlock data = self->unloaded_blocks.list[i];
@@ -302,7 +308,7 @@ void world_remove_unloaded_block(struct World *self, size_t i) {
 // Attempt to load any NULL chunks
 static void load_empty_chunks(struct World *self) {
 
-    const double starting_time = hpc_gettime();
+    //const double starting_time = hpc_gettime();
     world_foreach_offset_ftb(self, i, offset) {
         if (self->chunks[i] == NULL &&
             self->throttles.load.count < self->throttles.load.max) {
@@ -311,9 +317,9 @@ static void load_empty_chunks(struct World *self) {
         }
     }
 
-    const double end_time = hpc_gettime();
+    /*const double end_time = hpc_gettime();
     const double elapsed_time = end_time - starting_time;
-    printf("Elapsed time: %f\n", elapsed_time);
+    printf("Elapsed time: %f\n", elapsed_time);*/
 }
 
 // Centers the world's loaded chunks around the specified block position

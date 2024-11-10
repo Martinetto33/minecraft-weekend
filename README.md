@@ -1,22 +1,34 @@
-# Minecraft, but I made it in 48 hours*
+# A Minecraft clone with parallel procedural generation
 
-\* I've actually updated it since - [see this commit for the 48 hour version](https://github.com/jdah/minecraft-weekend/tree/cb19738305804b5734faa7118c1c784f26ff9463).
+## Disclaimer
+The vast majority of this code was created by jdah. I was simply left astonished by his work and felt inspired to add something to it. Even this beautiful picture below is only his merit, not mine :)
 
 ![screenshot](screenshots/1.png)
 
-#### Features:
-- Infinite, procedurally generated world
-- Infinite height/depth
-- Day/night cycle
-- Biomes
-- ECS-driven player and entities with full collision and movement
-- Full RGB lighting
-- Full transparency + translucency support
-- Sprite blocks (flowers)
-- Animated blocks (water + lava)
-- Distance fog
-- A whole lot of different block types
-- More
+## This is my thesis!
+___
+This project is my thesis for the Computer Science and Engineering bachelor's degree at the Alma Mater Studiorum - University of Bologna, Italy.
+The aim was to use a NVIDIA GPU with CUDA enabled to parallelise the procedural generation of the height maps and blocks in the chunks of the world.
+All the code I added is available in the <span style="color:cyan"><i>src/cuda</i></span> folder, with minor changes made to <span style="color:cyan"><i>src/world/gen/worldgen.c</i></span>.
+
+The parallelised code proved to be faster than the serial code on my machine. While being efficient, this version can be still improved in many ways.
+
+If you're bold enough to collaborate or to propose your changes, I'm definitely interested. :D
+
+## Setting the project up
+___
+#### Requirements
+
+- CUDA enabled GPU
+- CUDA Toolkit installed and environment correctly set up; it's not that easy, it may take a while...
+- Unix-like environment
+
+You will probably need to know the compute capability of your GPU and change the `Makefile` in the root directory accordingly. Line 60 is what you're interested in, and it looks like this:
+
+```aiignore
+$(CUDA_COMPILER) -arch=sm_75 -dlink $(CUDA_OBJ) -o gpuCode.o -L/opt/cuda/nvvm/lib64 -lcudart
+```
+Change the `-arch=sm_xx` option with your compute capability without a dot written in place of `xx`. You can find your GPU compute capability by looking it up here: https://developer.nvidia.com/cuda-gpus. As an alternative, you can try completely removing the `-arch=sm_xx` option.
 
 #### Building
 
@@ -46,7 +58,7 @@ If you are getting "cannot open file" errors (such as "cannot find ./res/shaders
 
 ##### Windows
 
-good luck 🤷‍♂️ probably try building under WSL and using an X environment to pass graphics through.
+Good luck 🤷‍♂️ probably try building under WSL and using an X environment to pass graphics through.
 
 ##### Troubleshooting
 
